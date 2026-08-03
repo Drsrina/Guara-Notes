@@ -1,58 +1,194 @@
-import { useState } from 'react';
+import { useState } from 'react'
+import { useAppStore, useAuthStore } from '../store'
+import { notesApi } from '../api/notes'
+import { foldersApi } from '../api/folders'
 
-interface Note { id: string; title: string; folder_id: string | null }
-interface Folder { id: string; name: string; parent_folder_id: string | null }
+type SortKey = 'updated_at' | 'created_at' | 'title'
 
 export default function Sidebar() {
-  const [notes] = useState<Note[]>([
-    { id: '1', title: 'Welcome to Guará-Notes', folder_id: null },
-    { id: '2', title: 'AI Companion Setup', folder_id: 'f1' },
-  ]);
-  const [folders] = useState<Folder[]>([
-    { id: 'f1', name: 'Tutorials', parent_folder_id: null }
-  ]);
+  const { notes, folders, activeNoteId, setActiveNoteId, upsertNote, removeNote, upsertFolder, removeFolder, notesLoading } = useAppStore()
+  const { logout, user } = useAuthStore()
+  const [sortKey, setSortKey] = useState<SortKey>('updated_at')
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+
+  const sortedNotes = [...notes].sort((a, b) => {
+    if (sortKey === 'title') return a.title.localeCompare(b.title)
+    return new Date(b[sortKey]).getTime() - new Date(a[sortKey]).getTime()
+  })
+
+  const handleNewNote = async () => {
+    try {
+      const res = await notesApi.create({ title: 'Nova Nota', content: '' })
+      upsertNote(res.data)
+      setActiveNoteId(res.data.id)
+    } catch (e) {
+      console.error('Erro ao criar nota', e)
+    }
+  }
+
+  const handleNewFolder = async () => {
+    const name = prompt('Nome da pasta:')
+    if (!name) return
+    try {
+      const res = await foldersApi.create({ name })
+      upsertFolder(res.data)
+    } catch (e) {
+      console.error('Erro ao criar pasta', e)
+    }
+  }
+
+  const handleDeleteNote = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    if (!confirm('Excluir esta nota?')) return
+    try {
+      await notesApi.delete(id)
+      removeNote(id)
+    } catch (e) {
+      console.error('Erro ao excluir nota', e)
+    }
+  }
+
+  const toggleFolder = (id: string) => {
+    setExpandedFolders(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
 
   return (
     <aside className="w-64 glass flex flex-col h-full border-r border-white/10 shrink-0">
-      <div className="p-4 border-b border-white/10 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-guara-neon tracking-wide">Guará-Notes</h1>
-      </div>
-      
-      <div className="flex-1 overflow-y-auto p-2 space-y-2">
-        <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wider px-2 pt-2">
-          Workspace
+      {/* Header */}
+      <div className="p-4 border-b border-white/10">
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-lg font-bold text-guara-neon tracking-wide">Guará-Notes</h1>
+          <button
+            id="sidebar-logout"
+            onClick={logout}
+            title="Sair"
+            className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs"
+          >
+            ⎋
+          </button>
         </div>
-        
-        {folders.map(folder => (
-          <div key={folder.id} className="group">
-            <div className="flex items-center px-2 py-1.5 text-sm text-zinc-300 hover:bg-white/5 rounded cursor-pointer transition-colors">
-              <span className="mr-2 text-zinc-500">📁</span>
-              {folder.name}
-            </div>
-            <div className="pl-6 space-y-1 mt-1">
-              {notes.filter(n => n.folder_id === folder.id).map(note => (
-                <div key={note.id} className="flex items-center px-2 py-1 text-sm text-zinc-400 hover:text-guara-neon-light hover:bg-white/5 rounded cursor-pointer transition-colors">
-                  <span className="mr-2 text-zinc-600 opacity-50">📄</span>
-                  <span className="truncate">{note.title}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+
+        {/* Ações rápidas */}
+        <div className="flex gap-1">
+          <button
+            id="new-note-btn"
+            onClick={handleNewNote}
+            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 rounded-lg border border-orange-500/20 transition-all"
+          >
+            <span>+</span> Nota
+          </button>
+          <button
+            id="new-folder-btn"
+            onClick={handleNewFolder}
+            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-white/5 hover:bg-white/10 text-zinc-400 rounded-lg border border-white/10 transition-all"
+          >
+            <span>📁</span> Pasta
+          </button>
+        </div>
+      </div>
+
+      {/* Sort */}
+      <div className="px-3 py-2 border-b border-white/5 flex gap-1">
+        {(['updated_at', 'created_at', 'title'] as SortKey[]).map(k => (
+          <button
+            key={k}
+            onClick={() => setSortKey(k)}
+            className={`text-xs px-2 py-1 rounded transition-colors ${sortKey === k ? 'bg-white/10 text-zinc-200' : 'text-zinc-600 hover:text-zinc-400'}`}
+          >
+            {k === 'updated_at' ? 'Edição' : k === 'created_at' ? 'Criação' : 'Nome'}
+          </button>
         ))}
-        
-        <div className="mt-4 space-y-1">
-           {notes.filter(n => n.folder_id === null).map(note => (
-              <div key={note.id} className="flex items-center px-2 py-1 text-sm text-zinc-400 hover:text-guara-neon-light hover:bg-white/5 rounded cursor-pointer transition-colors">
-                <span className="mr-2 text-zinc-600 opacity-50">📄</span>
-                <span className="truncate">{note.title}</span>
-              </div>
-            ))}
+      </div>
+
+      {/* Tree */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        {notesLoading && (
+          <div className="text-zinc-600 text-xs text-center py-4">Carregando...</div>
+        )}
+
+        {/* Pastas */}
+        {folders.map(folder => {
+          const folderNotes = sortedNotes.filter(n => n.folder_id === folder.id)
+          const isExpanded = expandedFolders.has(folder.id)
+          return (
+            <div key={folder.id}>
+              <button
+                onClick={() => toggleFolder(folder.id)}
+                className="w-full flex items-center px-2 py-1.5 text-sm text-zinc-300 hover:bg-white/5 rounded-lg cursor-pointer transition-colors"
+              >
+                <span className="mr-1.5 text-xs text-zinc-500">{isExpanded ? '▼' : '▶'}</span>
+                <span className="mr-1.5">📁</span>
+                <span className="truncate">{folder.name}</span>
+                <span className="ml-auto text-zinc-600 text-xs">{folderNotes.length}</span>
+              </button>
+              {isExpanded && (
+                <div className="pl-5 space-y-0.5 mt-0.5">
+                  {folderNotes.map(note => (
+                    <NoteItem
+                      key={note.id}
+                      note={note}
+                      active={note.id === activeNoteId}
+                      onClick={() => setActiveNoteId(note.id)}
+                      onDelete={(e) => handleDeleteNote(e, note.id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        {/* Notas sem pasta */}
+        <div className="mt-2">
+          <div className="text-xs text-zinc-600 uppercase tracking-wider px-2 py-1">Sem pasta</div>
+          {sortedNotes.filter(n => n.folder_id === null).map(note => (
+            <NoteItem
+              key={note.id}
+              note={note}
+              active={note.id === activeNoteId}
+              onClick={() => setActiveNoteId(note.id)}
+              onDelete={(e) => handleDeleteNote(e, note.id)}
+            />
+          ))}
         </div>
       </div>
-      
-      <div className="p-4 border-t border-white/10 text-xs text-zinc-500 text-center">
-         AI Powered
+
+      {/* Footer */}
+      <div className="p-3 border-t border-white/10 text-xs text-zinc-600 text-center">
+        {user?.display_name || user?.username} · AI Powered 🐺
       </div>
     </aside>
-  );
+  )
+}
+
+function NoteItem({
+  note, active, onClick, onDelete
+}: {
+  note: { id: string; title: string }
+  active: boolean
+  onClick: () => void
+  onDelete: (e: React.MouseEvent) => void
+}) {
+  return (
+    <div
+      onClick={onClick}
+      className={`group flex items-center px-2 py-1.5 text-sm rounded-lg cursor-pointer transition-colors ${
+        active ? 'bg-orange-500/15 text-orange-300 border border-orange-500/20' : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
+      }`}
+    >
+      <span className="mr-1.5 opacity-50 text-xs">📄</span>
+      <span className="truncate flex-1">{note.title || 'Sem título'}</span>
+      <button
+        onClick={onDelete}
+        className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-all ml-1 px-1"
+        title="Excluir"
+      >
+        ×
+      </button>
+    </div>
+  )
 }

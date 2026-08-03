@@ -3,41 +3,60 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # A URL da API é /api — proxy reverso do Nginx encaminha para o backend
+        VITE_API_URL: /api
     ports:
-      - "80:80"
+      - "5757:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --workers 2
     expose:
       - "8000"
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379/0
-      - AI_PROVIDER=${AI_PROVIDER:-local}
       - JWT_SECRET=${JWT_SECRET}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5757}
+      - AI_PROVIDER=${AI_PROVIDER:-local}
       - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL_EMBED=${OLLAMA_MODEL_EMBED:-nomic-embed-text}
+      - OLLAMA_MODEL_CHAT=${OLLAMA_MODEL_CHAT:-llama3.2:3b}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
+      - RAG_TOP_K=${RAG_TOP_K:-5}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped
 
   worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: celery -A worker.celery_app worker --loglevel=info
+    command: celery -A backend.worker.celery_app worker --loglevel=info --concurrency=2
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379/0
       - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL_EMBED=${OLLAMA_MODEL_EMBED:-nomic-embed-text}
+      - SEMANTIC_THRESHOLD=${SEMANTIC_THRESHOLD:-0.35}
+      - SEMANTIC_TOP_K=${SEMANTIC_TOP_K:-8}
     depends_on:
       - redis
       - postgres
@@ -61,15 +80,39 @@ services:
 
   redis:
     image: redis:7-alpine
+    command: redis-server --appendonly yes --appendfsync everysec
     volumes:
       - redis_data:/data
     restart: unless-stopped
 
+  # ─────────────────────────────────────────────────────────────
+  # Ollama — serve modelos de LLM e embedding localmente
+  #
+  # Para GPU NVIDIA: adicione ao seu .env → COMPOSE_PROFILES=gpu
+  # e garanta que o NVIDIA Container Toolkit está instalado.
+  # Sem GPU: roda em CPU (mais lento, mas funciona).
+  # ─────────────────────────────────────────────────────────────
   ollama:
     image: ollama/ollama:latest
     volumes:
       - ollama_data:/root/.ollama
     restart: unless-stopped
+    # GPU NVIDIA — só ativa com: docker compose --profile gpu up
+    profiles: ["cpu", "gpu"]
+
+  ollama-gpu:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    profiles: ["gpu"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
 volumes:
   postgres_data:
