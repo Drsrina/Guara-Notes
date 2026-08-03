@@ -38,6 +38,7 @@ interface AppState {
   notes: Note[]
   folders: Folder[]
   activeNoteId: string | null
+  focusMode: boolean
 
   // Loading states
   notesLoading: boolean
@@ -49,6 +50,7 @@ interface AppState {
   setActiveNoteId: (id: string | null) => void
   setNotesLoading: (v: boolean) => void
   setFoldersLoading: (v: boolean) => void
+  toggleFocusMode: () => void
 
   // Mutações locais (otimistic updates)
   upsertNote: (note: Note) => void
@@ -61,6 +63,7 @@ export const useAppStore = create<AppState>((set) => ({
   notes: [],
   folders: [],
   activeNoteId: null,
+  focusMode: false,
   notesLoading: false,
   foldersLoading: false,
 
@@ -69,6 +72,7 @@ export const useAppStore = create<AppState>((set) => ({
   setActiveNoteId: (id) => set({ activeNoteId: id }),
   setNotesLoading: (v) => set({ notesLoading: v }),
   setFoldersLoading: (v) => set({ foldersLoading: v }),
+  toggleFocusMode: () => set((state) => ({ focusMode: !state.focusMode })),
 
   upsertNote: (note) =>
     set((state) => ({

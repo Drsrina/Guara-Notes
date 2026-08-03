@@ -16,12 +16,12 @@ import { useState } from 'react'
 // Componente da view principal com tabs
 function MainView() {
   const [activeTab, setActiveTab] = useState<'editor' | 'graph2d' | 'brain3d'>('editor')
-  const { activeNoteId } = useAppStore()
+  const { activeNoteId, focusMode } = useAppStore()
 
   return (
     <Layout>
       <div className="flex h-full w-full">
-        <Sidebar />
+        {!focusMode && <Sidebar />}
         <div className="flex-1 flex flex-col relative h-full min-w-0">
           <div className="flex border-b border-white/10 bg-zinc-950 px-2 pt-2 gap-1 z-20 shrink-0">
             <button
@@ -53,7 +53,7 @@ function MainView() {
             {activeTab === 'brain3d' && <Brain3D />}
           </div>
         </div>
-        <AIChat />
+        {!focusMode && <AIChat />}
       </div>
     </Layout>
   )

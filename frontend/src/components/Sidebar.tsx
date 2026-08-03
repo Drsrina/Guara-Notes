@@ -118,6 +118,21 @@ export default function Sidebar() {
             <div key={folder.id}>
               <button
                 onClick={() => toggleFolder(folder.id)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={async (e) => {
+                  e.preventDefault()
+                  const noteId = e.dataTransfer.getData('noteId')
+                  if (!noteId) return
+                  try {
+                    const note = notes.find(n => n.id === noteId)
+                    if (note && note.folder_id !== folder.id) {
+                      const res = await notesApi.update(noteId, { folder_id: folder.id })
+                      upsertNote(res.data)
+                    }
+                  } catch (err) {
+                    console.error('Erro ao mover nota', err)
+                  }
+                }}
                 className="w-full flex items-center px-2 py-1.5 text-sm text-zinc-300 hover:bg-white/5 rounded-lg cursor-pointer transition-colors"
               >
                 <span className="mr-1.5 text-xs text-zinc-500">{isExpanded ? '▼' : '▶'}</span>
@@ -143,7 +158,24 @@ export default function Sidebar() {
         })}
 
         {/* Notas sem pasta */}
-        <div className="mt-2">
+        <div
+          className="mt-2 min-h-[50px]"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={async (e) => {
+            e.preventDefault()
+            const noteId = e.dataTransfer.getData('noteId')
+            if (!noteId) return
+            try {
+              const note = notes.find(n => n.id === noteId)
+              if (note && note.folder_id !== null) {
+                const res = await notesApi.update(noteId, { folder_id: null })
+                upsertNote(res.data)
+              }
+            } catch (err) {
+              console.error('Erro ao remover nota da pasta', err)
+            }
+          }}
+        >
           <div className="text-xs text-zinc-600 uppercase tracking-wider px-2 py-1">Sem pasta</div>
           {sortedNotes.filter(n => n.folder_id === null).map(note => (
             <NoteItem
@@ -176,6 +208,11 @@ function NoteItem({
   return (
     <div
       onClick={onClick}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('noteId', note.id)
+        e.dataTransfer.effectAllowed = 'move'
+      }}
       className={`group flex items-center px-2 py-1.5 text-sm rounded-lg cursor-pointer transition-colors ${
         active ? 'bg-orange-500/15 text-orange-300 border border-orange-500/20' : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
       }`}
