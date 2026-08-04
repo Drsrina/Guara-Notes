@@ -52,6 +52,7 @@ async def lifespan(app: FastAPI):
     # Seed: garantir usuário admin existe
     async with AsyncSessionLocal() as session:
         from sqlalchemy.future import select
+        from sqlalchemy.exc import IntegrityError
         result = await session.execute(
             select(models.User).filter(models.User.username == "admin")
         )
@@ -62,8 +63,12 @@ async def lifespan(app: FastAPI):
                 password_hash=get_password_hash("admin"),
             )
             session.add(admin)
-            await session.commit()
-            logger.info("✅ Usuário admin criado (user: admin / senha: admin)")
+            try:
+                await session.commit()
+                logger.info("✅ Usuário admin criado (user: admin / senha: admin)")
+            except IntegrityError:
+                await session.rollback()
+                logger.info("ℹ️  Usuário admin já existe (race condition ignorada).")
 
     yield
 

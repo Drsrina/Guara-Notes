@@ -6,7 +6,7 @@ import { foldersApi } from '../api/folders'
 type SortKey = 'updated_at' | 'created_at' | 'title'
 
 export default function Sidebar() {
-  const { notes, folders, activeNoteId, setActiveNoteId, upsertNote, removeNote, upsertFolder, removeFolder, notesLoading } = useAppStore()
+  const { notes, folders, activeNoteId, setActiveNoteId, upsertNote, removeNote, upsertFolder, notesLoading } = useAppStore()
   const { logout, user } = useAuthStore()
   const [sortKey, setSortKey] = useState<SortKey>('updated_at')
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
