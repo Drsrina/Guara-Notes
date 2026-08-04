@@ -80,3 +80,13 @@ class NoteLink(NoteLinkBase):
 
     class Config:
         from_attributes = True
+
+class NoteVersion(BaseModel):
+    id: UUID4
+    note_id: UUID4
+    title: str
+    content: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

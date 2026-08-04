@@ -11,3 +11,15 @@
 .glass {
   @apply bg-zinc-900/50 backdrop-blur-md border border-white/10;
 }
+
+.glass-panel {
+  @apply bg-zinc-900/60 backdrop-blur-xl border border-white/10 shadow-lg;
+}
+
+.text-glow-neon {
+  text-shadow: 0 0 10px rgba(255, 107, 26, 0.8), 0 0 20px rgba(255, 107, 26, 0.4);
+}
+
+.box-glow-neon {
+  box-shadow: 0 0 15px rgba(255, 107, 26, 0.3), inset 0 0 10px rgba(255, 107, 26, 0.1);
+}

@@ -124,6 +124,10 @@ async def update_note(
     if not db_note:
         raise HTTPException(status_code=404, detail="Note not found")
 
+    # Salva original para comparar
+    setattr(db_note, "_original_content", db_note.content)
+    setattr(db_note, "_original_title", db_note.title)
+
     update_data = note_update.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(db_note, key, value)
@@ -131,8 +135,29 @@ async def update_note(
     await db.commit()
     await db.refresh(db_note)
 
-    # Resync wikilinks e re-embeds sempre que título ou conteúdo mudam
+    # Resync wikilinks, re-embeds, and versioning se título ou conteúdo mudam
     if "content" in update_data or "title" in update_data:
+        # Verifica se o conteúdo ou título realmente mudaram em relação à versão salva para gerar backup
+        if getattr(db_note, "_original_content", db_note.content) != update_data.get("content", db_note.content) or getattr(db_note, "_original_title", db_note.title) != update_data.get("title", db_note.title):
+            # Cria versão
+            version = models.NoteVersion(
+                note_id=db_note.id,
+                title=getattr(db_note, "_original_title", db_note.title),
+                content=getattr(db_note, "_original_content", db_note.content)
+            )
+            db.add(version)
+            await db.commit()
+            
+            # Limpa versões antigas mantendo apenas as 2 mais recentes
+            versions_result = await db.execute(
+                select(models.NoteVersion).filter(models.NoteVersion.note_id == db_note.id).order_by(models.NoteVersion.created_at.desc())
+            )
+            all_versions = versions_result.scalars().all()
+            if len(all_versions) > 2:
+                for v_to_delete in all_versions[2:]:
+                    await db.delete(v_to_delete)
+                await db.commit()
+
         await _sync_wikilinks(db, db_note)
         await db.commit()
         _enqueue_embedding(db_note.id)
@@ -156,3 +181,69 @@ async def delete_note(
     await db.delete(db_note)
     await db.commit()
     return None
+
+
+@router.get("/{note_id}/versions", response_model=List[schemas.NoteVersion])
+async def get_note_versions(
+    note_id: uuid.UUID,
+    current_user: Annotated[models.User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(models.Note).filter(models.Note.id == note_id, models.Note.user_id == current_user.id)
+    )
+    db_note = result.scalars().first()
+    if not db_note:
+        raise HTTPException(status_code=404, detail="Note not found")
+
+    versions_result = await db.execute(
+        select(models.NoteVersion).filter(models.NoteVersion.note_id == note_id).order_by(models.NoteVersion.created_at.desc())
+    )
+    return versions_result.scalars().all()
+
+
+@router.post("/{note_id}/restore/{version_id}", response_model=schemas.Note)
+async def restore_note_version(
+    note_id: uuid.UUID,
+    version_id: uuid.UUID,
+    current_user: Annotated[models.User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(models.Note).filter(models.Note.id == note_id, models.Note.user_id == current_user.id)
+    )
+    db_note = result.scalars().first()
+    if not db_note:
+        raise HTTPException(status_code=404, detail="Note not found")
+
+    v_result = await db.execute(
+        select(models.NoteVersion).filter(models.NoteVersion.id == version_id, models.NoteVersion.note_id == note_id)
+    )
+    version = v_result.scalars().first()
+    if not version:
+        raise HTTPException(status_code=404, detail="Version not found")
+
+    # Salva original para virar o novo backup
+    old_title = db_note.title
+    old_content = db_note.content
+
+    # Restaura
+    db_note.title = version.title
+    db_note.content = version.content
+
+    # Cria versão do estado imediatamente anterior à restauração
+    new_backup = models.NoteVersion(
+        note_id=db_note.id,
+        title=old_title,
+        content=old_content
+    )
+    db.add(new_backup)
+    await db.delete(version) # Remove a versão que acabou de ser restaurada
+    await db.commit()
+    await db.refresh(db_note)
+
+    await _sync_wikilinks(db, db_note)
+    await db.commit()
+    _enqueue_embedding(db_note.id)
+
+    return db_note

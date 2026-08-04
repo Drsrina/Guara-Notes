@@ -21,19 +21,19 @@ CORS_ORIGINS = os.getenv(
 
 
 def _run_migrations():
-    """Roda alembic upgrade head de forma síncrona no startup."""
+    """Roda alembic upgrade head de forma síncrona com psycopg2 (recomendado pelo Alembic)."""
     import os
-    # Localiza o alembic.ini relativo a este arquivo
     base_dir = os.path.dirname(os.path.abspath(__file__))
     alembic_cfg = AlembicConfig(os.path.join(base_dir, "alembic.ini"))
-    # Garante que o script_location aponte corretamente
     alembic_cfg.set_main_option("script_location", os.path.join(base_dir, "alembic"))
-    # Usa a DATABASE_URL do ambiente
+
+    # Converte URL async (asyncpg) → sync (psycopg2) exclusivamente para as migrations
     db_url = os.getenv(
         "DATABASE_URL",
         "postgresql+asyncpg://guaranotes:guaranotes_secret@localhost:5432/guaranotes"
     )
-    alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+    sync_url = db_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
+    alembic_cfg.set_main_option("sqlalchemy.url", sync_url)
     try:
         alembic_command.upgrade(alembic_cfg, "head")
         logger.info("✅ Migrations aplicadas com sucesso.")

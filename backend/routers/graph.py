@@ -67,6 +67,7 @@ async def get_brain3d(
             models.Note.umap_x,
             models.Note.umap_y,
             models.Note.umap_z,
+            models.Note.embedding,
         ).filter(models.Note.user_id == current_user.id)
     )
     notes = notes_result.all()
@@ -78,7 +79,8 @@ async def get_brain3d(
             "x": n.umap_x or 0.0,
             "y": n.umap_y or 0.0,
             "z": n.umap_z or 0.0,
-            "has_embedding": n.umap_x is not None,
+            "has_embedding": n.umap_x is not None or n.embedding is not None,
+            "embedding": list(n.embedding) if n.embedding is not None else None,
         }
         for n in notes
     ]

@@ -70,6 +70,18 @@ class Note(Base):
 
     user = relationship("User")
     folder = relationship("Folder")
+    versions = relationship("NoteVersion", back_populates="note", cascade="all, delete-orphan")
+
+
+class NoteVersion(Base):
+    __tablename__ = "note_versions"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    note_id = Column(UUID(as_uuid=True), ForeignKey("notes.id", ondelete="CASCADE"))
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_now)
+
+    note = relationship("Note", back_populates="versions")
 
 
 class NoteLink(Base):

@@ -75,3 +75,17 @@ async def login_for_access_token(
 @router.get("/users/me", response_model=schemas.User)
 async def read_users_me(current_user: Annotated[models.User, Depends(get_current_user)]):
     return current_user
+
+class UserPrefsUpdate(schemas.BaseModel):
+    theme_prefs: dict
+
+@router.put("/users/me", response_model=schemas.User)
+async def update_users_me(
+    prefs_update: UserPrefsUpdate,
+    current_user: Annotated[models.User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db)
+):
+    current_user.theme_prefs = prefs_update.theme_prefs
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
