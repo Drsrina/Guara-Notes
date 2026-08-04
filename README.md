@@ -3,6 +3,8 @@
 > **Ferramenta de escrita com IA e vetores para escritores e pesquisadores.**
 > Self-hosted, privado, poderoso. Roda com Ollama local (CPU/GPU) ou APIs externas.
 
+O diferencial do Guará-Notes não está na "ideia conceitual", mas em como ela foi implementada como um produto de engenharia:Cérebro Semântico 3D via UMAP: Reduzir vetores de alta dimensão (1536 posições do nomic-embed-text) para coordenadas X, Y, Z visíveis em um ambiente interativo 3D com Three.js é algo raríssimo de ver pronto e funcional em projetos open-source simples.Pipeline de Engenharia Robusto: Integrar FastAPI + Celery + Redis + pgvector em um pacote Docker com bootstrap automático para rodar LLMs pesados localmente (via Ollama) é uma arquitetura de nível empresarial entregue de forma acessível.Privacidade Absoluta para Escritores: Misturar a experiência fluida de escrita com o poder de IA generativa sem que uma única linha de texto saia do computador do usuário resolve a maior dor de autores e pesquisadores que temem o plágio ou o treino de modelos comerciais com suas obras.
+
 ---
 
 ## ✨ Features

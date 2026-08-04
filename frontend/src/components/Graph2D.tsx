@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import { graphApi, type GraphData } from '../api/graph'
 import { useAppStore } from '../store'
 
 export default function Graph2D() {
   const containerRef = useRef<HTMLDivElement>(null)
+  const fgRef = useRef<any>(null)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] })
   const [loading, setLoading] = useState(true)
@@ -22,8 +23,32 @@ export default function Graph2D() {
       .finally(() => setLoading(false))
   }, [])
 
-  const handleNodeClick = (node: { id?: string | number }) => {
+  const handleNodeClick = useCallback((node: { id?: string | number, x?: number, y?: number }) => {
     if (node.id) setActiveNoteId(String(node.id))
+    if (node.x && node.y && fgRef.current) {
+      fgRef.current.centerAt(node.x, node.y, 1000)
+      fgRef.current.zoom(2, 1000)
+    }
+  }, [setActiveNoteId])
+
+  const handleZoomIn = () => {
+    if (fgRef.current) {
+      const currentZoom = fgRef.current.zoom()
+      fgRef.current.zoom(currentZoom * 1.5, 400)
+    }
+  }
+
+  const handleZoomOut = () => {
+    if (fgRef.current) {
+      const currentZoom = fgRef.current.zoom()
+      fgRef.current.zoom(currentZoom / 1.5, 400)
+    }
+  }
+
+  const handleCenter = () => {
+    if (fgRef.current) {
+      fgRef.current.zoomToFit(400, 50)
+    }
   }
 
   return (
@@ -37,7 +62,21 @@ export default function Graph2D() {
         <span><span className="text-orange-400">●</span> Wikilink</span>
         <span><span className="text-blue-400">●</span> Semântico</span>
       </div>
+      
+      <div className="absolute bottom-6 right-6 z-10 flex flex-col gap-2 glass-panel p-2 rounded-lg box-glow-neon border border-guara-neon/20">
+        <button onClick={handleZoomIn} className="w-8 h-8 flex items-center justify-center bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded transition-colors text-lg" title="Aumentar Zoom">
+          +
+        </button>
+        <button onClick={handleZoomOut} className="w-8 h-8 flex items-center justify-center bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded transition-colors text-lg" title="Diminuir Zoom">
+          −
+        </button>
+        <button onClick={handleCenter} className="w-8 h-8 flex items-center justify-center bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded transition-colors text-sm" title="Centralizar Grafo">
+          🎯
+        </button>
+      </div>
+
       <ForceGraph2D
+        ref={fgRef}
         width={dimensions.width}
         height={dimensions.height}
         graphData={{

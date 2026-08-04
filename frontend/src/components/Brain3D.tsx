@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import ForceGraph3D from 'react-force-graph-3d'
 import { graphApi, type GraphNode } from '../api/graph'
 import { useAppStore } from '../store'
@@ -24,7 +24,7 @@ export default function Brain3D() {
   const [ready, setReady] = useState(false)
   const [similarityThreshold, setSimilarityThreshold] = useState(0.70)
   const { setActiveNoteId } = useAppStore()
-  const fgRef = useRef<any>()
+  const fgRef = useRef<any>(null)
 
   const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight })
 
@@ -63,8 +63,8 @@ export default function Brain3D() {
         const nodeB = nodes[j]
         
         // Verifica as propriedades de array (pgvector retorna float array)
-        if (nodeA.embedding && nodeB.embedding && Array.isArray(nodeA.embedding) && Array.isArray(nodeB.embedding)) {
-          const sim = cosineSim(nodeA.embedding, nodeB.embedding)
+        if ((nodeA as any).embedding && (nodeB as any).embedding && Array.isArray((nodeA as any).embedding) && Array.isArray((nodeB as any).embedding)) {
+          const sim = cosineSim((nodeA as any).embedding, (nodeB as any).embedding)
           
           if (sim >= similarityThreshold) {
             newLinks.push({
@@ -79,6 +79,26 @@ export default function Brain3D() {
     
     setLinks(newLinks)
   }, [nodes, similarityThreshold])
+
+  const handleZoomIn = () => {
+    if (fgRef.current) {
+      const pos = fgRef.current.cameraPosition()
+      fgRef.current.cameraPosition({ x: pos.x * 0.8, y: pos.y * 0.8, z: pos.z * 0.8 }, null, 400)
+    }
+  }
+
+  const handleZoomOut = () => {
+    if (fgRef.current) {
+      const pos = fgRef.current.cameraPosition()
+      fgRef.current.cameraPosition({ x: pos.x * 1.2, y: pos.y * 1.2, z: pos.z * 1.2 }, null, 400)
+    }
+  }
+
+  const handleCenter = () => {
+    if (fgRef.current) {
+      fgRef.current.zoomToFit(400, 50)
+    }
+  }
 
   return (
     <div id="brain-container" className="w-full h-full bg-zinc-950 relative flex overflow-hidden">
@@ -121,6 +141,18 @@ export default function Brain3D() {
           💡 Crie e edite notas para iniciar o processamento de embeddings. O cérebro revelará conexões ocultas.
         </div>
       )}
+
+      <div className="absolute bottom-6 right-6 z-10 flex flex-col gap-2 glass-panel p-2 rounded-lg box-glow-neon border border-guara-neon/20">
+        <button onClick={handleZoomIn} className="w-8 h-8 flex items-center justify-center bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded transition-colors text-lg" title="Aproximar">
+          +
+        </button>
+        <button onClick={handleZoomOut} className="w-8 h-8 flex items-center justify-center bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded transition-colors text-lg" title="Afastar">
+          −
+        </button>
+        <button onClick={handleCenter} className="w-8 h-8 flex items-center justify-center bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded transition-colors text-sm" title="Centralizar Cérebro">
+          🎯
+        </button>
+      </div>
 
       <div className="w-full h-full flex-1">
         <ForceGraph3D

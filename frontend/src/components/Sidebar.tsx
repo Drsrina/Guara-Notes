@@ -7,9 +7,29 @@ type SortKey = 'updated_at' | 'created_at' | 'title'
 
 export default function Sidebar() {
   const { notes, folders, activeNoteId, setActiveNoteId, upsertNote, removeNote, upsertFolder, notesLoading } = useAppStore()
-  const { logout, user } = useAuthStore()
+  const { logout, user, setUser } = useAuthStore()
   const [sortKey, setSortKey] = useState<SortKey>('updated_at')
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const [showSettings, setShowSettings] = useState(false)
+  const [aiProvider, setAiProvider] = useState<string>((user?.theme_prefs as any)?.ai_provider || 'local')
+
+  const handleSaveSettings = async () => {
+    try {
+      // Mock da chamada da API se api/auth.ts não tiver método update, depois atualizamos lá também.
+      // fetch PUT /api/auth/users/me
+      const token = useAuthStore.getState().token
+      const res = await fetch('/api/auth/users/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ theme_prefs: { ...(user?.theme_prefs || {}), ai_provider: aiProvider } })
+      })
+      const data = await res.json()
+      setUser(data)
+      setShowSettings(false)
+    } catch (e) {
+      console.error('Erro ao salvar configurações', e)
+    }
+  }
 
   const sortedNotes = [...notes].sort((a, b) => {
     if (sortKey === 'title') return a.title.localeCompare(b.title)
@@ -61,15 +81,24 @@ export default function Sidebar() {
       {/* Header */}
       <div className="p-4 border-b border-white/10">
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-lg font-bold text-guara-neon tracking-wide">Guará-Notes</h1>
-          <button
-            id="sidebar-logout"
-            onClick={logout}
-            title="Sair"
-            className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs"
-          >
-            ⎋
-          </button>
+          <h1 className="text-lg font-bold text-guara-neon tracking-wide text-glow-neon">Guará-Notes</h1>
+          <div className="flex gap-2 items-center">
+            <button
+              onClick={() => setShowSettings(true)}
+              title="Configurações"
+              className="text-zinc-500 hover:text-zinc-300 transition-colors text-sm"
+            >
+              ⚙️
+            </button>
+            <button
+              id="sidebar-logout"
+              onClick={logout}
+              title="Sair"
+              className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs"
+            >
+              ⎋
+            </button>
+          </div>
         </div>
 
         {/* Ações rápidas */}
@@ -190,9 +219,52 @@ export default function Sidebar() {
       </div>
 
       {/* Footer */}
-      <div className="p-3 border-t border-white/10 text-xs text-zinc-600 text-center">
-        {user?.display_name || user?.username} · AI Powered 🐺
+      <div className="p-3 border-t border-white/10 text-xs text-zinc-600 text-center flex items-center justify-between">
+        <span>{user?.display_name || user?.username}</span>
+        <span className="text-orange-500/50">AI Powered 🐺</span>
       </div>
+
+      {/* Modal de Configurações */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="glass-panel p-6 rounded-lg w-96 max-w-[90vw] shadow-2xl box-glow-neon border border-guara-neon/30">
+            <h2 className="text-lg font-bold text-guara-neon mb-4">Configurações</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Provedor de IA (Companion)</label>
+                <select 
+                  value={aiProvider}
+                  onChange={(e) => setAiProvider(e.target.value)}
+                  className="w-full bg-zinc-900 border border-white/10 rounded px-2 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-guara-neon"
+                >
+                  <option value="local">Ollama (Local)</option>
+                  <option value="gemini">Google Gemini</option>
+                  <option value="claude">Anthropic Claude</option>
+                </select>
+                <p className="text-[10px] text-zinc-500 mt-1">
+                  Nota: Chaves de API para serviços externos devem ser configuradas no backend (.env).
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button 
+                onClick={() => setShowSettings(false)}
+                className="px-4 py-1.5 rounded bg-zinc-800 text-zinc-300 hover:bg-zinc-700 text-sm transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleSaveSettings}
+                className="px-4 py-1.5 rounded bg-guara-neon/20 border border-guara-neon text-guara-neon hover:bg-guara-neon hover:text-zinc-950 font-medium text-sm transition-colors"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   )
 }
