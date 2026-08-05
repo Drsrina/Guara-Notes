@@ -33,7 +33,7 @@ export default function Pane({ pane, canClose, canSplit }: PaneProps) {
       case 'editor':  return <Editor noteId={pane.activeNoteId} panelId={pane.id} />
       case 'graph2d': return <Graph2D />
       case 'brain3d': return <Brain3D />
-      case 'chat':    return <AIChat inline={true} noteId={pane.activeNoteId} />
+      case 'chat':    return <AIChat inline={true} noteId={pane.activeNoteId} paneId={pane.id} />
       default:        return null
     }
   }

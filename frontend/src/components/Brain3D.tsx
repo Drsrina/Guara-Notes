@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo } from 'react'
 import ForceGraph3D from 'react-force-graph-3d'
 import { graphApi, type GraphNode } from '../api/graph'
-import { useAppStore, useTagsStore, useSettingsStore } from '../store'
+import { useAppStore, useTagsStore, useSettingsStore, useWorkspaceStore } from '../store'
 
 function cosineSim(vecA: number[], vecB: number[]) {
   let dotProduct = 0
@@ -21,7 +21,8 @@ export default function Brain3D() {
   const [links, setLinks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [ready, setReady] = useState(false)
-  const { setActiveNoteId, notes } = useAppStore()
+  const { notes } = useAppStore()
+  const { openNoteInFocusedPane } = useWorkspaceStore()
   const { getTagColor } = useTagsStore()
   const { settings, updateSettings } = useSettingsStore()
   const fgRef = useRef<any>(null)
@@ -177,7 +178,7 @@ export default function Brain3D() {
           linkColor={() => 'rgba(255, 107, 26, 0.4)'}
           linkWidth={1.5}
           linkOpacity={0.6}
-          onNodeClick={(node: any) => setActiveNoteId(node.id)}
+          onNodeClick={(node: any) => openNoteInFocusedPane(node.id)}
           backgroundColor="#0F0F1E"
           enableNodeDrag={false}
           showNavInfo={false}

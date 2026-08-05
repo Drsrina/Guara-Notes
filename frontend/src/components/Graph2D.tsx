@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import { graphApi, type GraphData } from '../api/graph'
-import { useAppStore, useTagsStore, useSettingsStore } from '../store'
+import { useAppStore, useTagsStore, useSettingsStore, useWorkspaceStore } from '../store'
 
 export default function Graph2D() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -10,7 +10,8 @@ export default function Graph2D() {
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] })
   const [loading, setLoading] = useState(true)
 
-  const { setActiveNoteId, notes } = useAppStore()
+  const { notes } = useAppStore()
+  const { openNoteInFocusedPane } = useWorkspaceStore()
   const { getTagColor } = useTagsStore()
   const { settings } = useSettingsStore()
 
@@ -60,12 +61,12 @@ export default function Graph2D() {
   }, [graphData, notes])
 
   const handleNodeClick = useCallback((node: any) => {
-    if (node.id) setActiveNoteId(String(node.id))
+    if (node.id) openNoteInFocusedPane(String(node.id))
     if (node.x && node.y && fgRef.current) {
       fgRef.current.centerAt(node.x, node.y, 1000)
       fgRef.current.zoom(2, 1000)
     }
-  }, [setActiveNoteId])
+  }, [openNoteInFocusedPane])
 
   const handleZoomIn = () => fgRef.current?.zoom(fgRef.current.zoom() * 1.5, 400)
   const handleZoomOut = () => fgRef.current?.zoom(fgRef.current.zoom() / 1.5, 400)

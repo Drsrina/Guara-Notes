@@ -14,11 +14,11 @@ export interface UserProfile {
   theme_prefs: Record<string, unknown>
   created_at: string
   updated_at: string
+  is_admin?: boolean
 }
 
 export const authApi = {
   login: (username: string, password: string) => {
-    // OAuth2PasswordRequestForm espera form-data
     const form = new URLSearchParams()
     form.append('username', username)
     form.append('password', password)
@@ -31,4 +31,9 @@ export const authApi = {
     api.post<UserProfile>('/auth/register', data),
 
   me: () => api.get<UserProfile>('/auth/users/me'),
+
+  updateMe: (data: Partial<UserProfile>) => api.put<UserProfile>('/auth/users/me', data),
+
+  changePassword: (data: { current_password: string; new_password: string }) =>
+    api.put<UserProfile>('/auth/users/me/password', data),
 }

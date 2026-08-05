@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { useAppStore } from '../store'
+import { useAppStore, useWorkspaceStore } from '../store'
 
 export default function Dataview() {
-  const { notes, folders, setActiveNoteId } = useAppStore()
+  const { notes, folders } = useAppStore()
+  const { openNoteInFocusedPane } = useWorkspaceStore()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedFolder, setSelectedFolder] = useState<string>('all')
   const [selectedTag, setSelectedTag] = useState<string>('all')
@@ -116,7 +117,7 @@ export default function Dataview() {
                 </td>
                 <td className="py-3 px-4 text-right">
                   <button
-                    onClick={() => setActiveNoteId(n.id)}
+                    onClick={() => openNoteInFocusedPane(n.id)}
                     className="text-xs bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded transition-colors"
                   >
                     Abrir

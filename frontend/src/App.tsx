@@ -1,18 +1,21 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
+import { Toaster } from 'react-hot-toast'
 import Sidebar from './components/Sidebar'
 import Workspace from './components/Workspace'
 import Editor from './components/Editor'
 import LoginPage from './pages/LoginPage'
-import { useAuthStore, useAppStore } from './store'
+import { useAuthStore, useAppStore, useWorkspaceStore, useSettingsStore } from './store'
 import { notesApi } from './api/notes'
 import { foldersApi } from './api/folders'
 import { authApi } from './api/auth'
 
 
 function MainView() {
-  const { activeNoteId, focusMode, setFocusMode } = useAppStore()
+  const { focusMode, setFocusMode } = useAppStore()
+  const { panes, focusedPaneId } = useWorkspaceStore()
+  const activeNoteId = panes.find(p => p.id === focusedPaneId)?.activeNoteId || null
 
   // ── Modo Escritor (Focus) ────────────────────────────────────────────────────
   if (focusMode) {
@@ -60,7 +63,7 @@ function DataLoader({ children }: { children: React.ReactNode }) {
     if (!token) return
     authApi.me().then((r) => setUser(r.data)).catch(() => {})
     setNotesLoading(true)
-    notesApi.list().then((r) => setNotes(r.data)).finally(() => setNotesLoading(false))
+    notesApi.list({ limit: 1000 }).then((r) => setNotes(r.data.items)).finally(() => setNotesLoading(false))
     setFoldersLoading(true)
     foldersApi.list().then((r) => setFolders(r.data)).finally(() => setFoldersLoading(false))
   }, [token])
@@ -69,8 +72,28 @@ function DataLoader({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  const { settings } = useSettingsStore()
+
+  useEffect(() => {
+    const root = document.documentElement
+    // Applica configurações globais como CSS Variables
+    root.style.setProperty('--glass-blur', `${settings.glassBlur}px`)
+    root.style.setProperty('--panel-opacity', `${settings.panelOpacity}`)
+    if (settings.uiDensity === 'compact') {
+      root.style.setProperty('--spacing-scale', '0.75')
+    } else if (settings.uiDensity === 'spacious') {
+      root.style.setProperty('--spacing-scale', '1.25')
+    } else {
+      root.style.setProperty('--spacing-scale', '1')
+    }
+  }, [settings.glassBlur, settings.panelOpacity, settings.uiDensity])
+
   return (
     <BrowserRouter>
+      <Toaster position="bottom-right" toastOptions={{ 
+        className: 'bg-bg-tertiary text-text-primary text-sm border border-white/10 shadow-xl backdrop-blur-md',
+        style: { background: 'rgba(20, 20, 35, 0.8)', color: '#fff', borderRadius: '8px' } 
+      }} />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/*" element={<ProtectedRoute><DataLoader><MainView /></DataLoader></ProtectedRoute>} />

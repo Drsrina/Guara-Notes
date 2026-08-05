@@ -1,15 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Modal } from './ui/Modal'
 import { Button } from './ui/Button'
 import { useSettingsStore, useAuthStore, useAppStore } from '../store'
 import { authApi } from '../api/auth'
+import { notesApi } from '../api/notes'
+import { adminApi } from '../api/admin'
+import type { UserAdminView } from '../api/admin'
+import { ollamaApi } from '../api/ollama'
+import type { OllamaModelInfo, OllamaStatus } from '../api/ollama'
+import { confirmDialog } from './ui/Dialogs'
+import toast from 'react-hot-toast'
 
 interface SettingsModalProps {
   isOpen: boolean
   onClose: () => void
 }
 
-type TabId = 'appearance' | 'editor' | 'graph' | 'ai' | 'data' | 'profile'
+type TabId = 'appearance' | 'editor' | 'graph' | 'ai' | 'data' | 'profile' | 'admin' | 'ollama'
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>('appearance')
@@ -19,15 +26,145 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   // Profile Form state
   const [displayName, setDisplayName] = useState(user?.display_name || '')
+  const [bio, setBio] = useState(user?.bio || '')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
 
+  // Admin state
+  const [usersList, setUsersList] = useState<UserAdminView[]>([])
+  const [showNewUser, setShowNewUser] = useState(false)
+  const [newUsername, setNewUsername] = useState('')
+  const [newUserPass, setNewUserPass] = useState('')
+  const [newUserName, setNewUserName] = useState('')
+  const [newUserAdmin, setNewUserAdmin] = useState(false)
+
+  // Ollama state
+  const [ollamaStatus, setOllamaStatus] = useState<OllamaStatus | null>(null)
+  const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([])
+  const [pullModelName, setPullModelName] = useState('')
+  const [pullProgress, setPullProgress] = useState<any>(null)
+
+  useEffect(() => {
+    if (isOpen) {
+      if (activeTab === 'admin' && user?.is_admin) {
+        loadAdminUsers()
+      } else if (activeTab === 'ollama' && user?.is_admin) {
+        loadOllamaData()
+      }
+    }
+  }, [isOpen, activeTab, user?.is_admin])
+
+  // --- Profile Actions ---
   const handleSaveProfile = async () => {
-    // In a real app we'd have an update endpoint
     try {
-      const res = await authApi.me() // Simulating for now, no update endpoint in auth API yet
-      // If we had update: await authApi.update({ display_name: displayName })
-      setUser({ ...res.data, display_name: displayName })
-      alert('Perfil atualizado (simulado)')
-    } catch (e) {}
+      const res = await authApi.updateMe({ display_name: displayName, bio })
+      setUser(res.data)
+      toast.success('Perfil atualizado')
+    } catch (e) {
+      toast.error('Erro ao atualizar perfil')
+    }
+  }
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword) return
+    try {
+      await authApi.changePassword({ current_password: currentPassword, new_password: newPassword })
+      toast.success('Senha alterada com sucesso')
+      setCurrentPassword('')
+      setNewPassword('')
+    } catch (e) {
+      toast.error('Erro ao alterar senha')
+    }
+  }
+
+  // --- Admin Actions ---
+  const loadAdminUsers = async () => {
+    try {
+      const res = await adminApi.listUsers()
+      setUsersList(res.data)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const handleCreateUser = async () => {
+    try {
+      await adminApi.createUser({
+        username: newUsername,
+        password: newUserPass,
+        display_name: newUserName,
+        is_admin: newUserAdmin
+      })
+      toast.success('Usuário criado!')
+      setShowNewUser(false)
+      loadAdminUsers()
+    } catch (e) {
+      toast.error('Erro ao criar usuário')
+    }
+  }
+
+  const handleDeleteUser = async (id: string) => {
+    confirmDialog('Excluir Usuário', 'Deseja excluir este usuário e TODAS as suas notas?', async () => {
+      try {
+        await adminApi.deleteUser(id)
+        loadAdminUsers()
+        toast.success('Usuário excluído')
+      } catch (e) {
+        toast.error('Erro ao excluir usuário')
+      }
+    })
+  }
+
+  // --- Ollama Actions ---
+  const loadOllamaData = async () => {
+    try {
+      const st = await ollamaApi.getStatus()
+      setOllamaStatus(st.data)
+      const md = await ollamaApi.listModels()
+      setOllamaModels(md.data.models)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const handlePullModel = () => {
+    if (!pullModelName) return
+    setPullProgress({ status: 'Iniciando...' })
+    ollamaApi.pullModelSSE(
+      pullModelName,
+      (data) => setPullProgress(data),
+      (err) => toast.error(`Erro: ${err}`),
+      () => {
+        setPullProgress({ status: 'Concluído' })
+        setTimeout(() => setPullProgress(null), 3000)
+        loadOllamaData()
+      }
+    )
+  }
+
+  const handleDeleteModel = async (name: string) => {
+    confirmDialog('Remover Modelo', `Remover o modelo ${name}?`, async () => {
+      try {
+        await ollamaApi.deleteModel(name)
+        loadOllamaData()
+        toast.success('Modelo removido')
+      } catch (e: any) {
+        toast.error('Erro: ' + (e.response?.data?.detail || e.message))
+      }
+    })
+  }
+
+  const handleUpdateActiveModel = async (type: 'chat' | 'embed', modelName: string) => {
+    try {
+      await ollamaApi.updateConfig({
+        chat_model: type === 'chat' ? modelName : undefined,
+        embed_model: type === 'embed' ? modelName : undefined
+      })
+      loadOllamaData()
+      toast.success('Configuração atualizada')
+    } catch (e) {
+      toast.error('Erro ao atualizar config')
+    }
   }
 
   const handleExportBase = () => {
@@ -41,21 +178,25 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     URL.revokeObjectURL(url)
   }
 
-  const tabs: { id: TabId, label: string, icon: string }[] = [
+  const tabs: { id: TabId, label: string, icon: string, adminOnly?: boolean }[] = [
     { id: 'appearance', label: 'Aparência', icon: '🎨' },
     { id: 'editor', label: 'Editor', icon: '📝' },
     { id: 'graph', label: 'Grafo & Cérebro', icon: '🧠' },
     { id: 'ai', label: 'IA Companion', icon: '🤖' },
     { id: 'data', label: 'Dados & Sync', icon: '💾' },
     { id: 'profile', label: 'Perfil', icon: '👤' },
+    { id: 'ollama', label: 'Ollama', icon: '🦙', adminOnly: true },
+    { id: 'admin', label: 'Admin', icon: '🛡️', adminOnly: true },
   ]
+
+  const visibleTabs = tabs.filter(t => !t.adminOnly || user?.is_admin)
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Configurações" className="w-[800px] max-w-[95vw] h-[600px] max-h-[90vh]">
       <div className="flex h-full -mx-6 -my-6">
         {/* Sidebar Tabs */}
-        <div className="w-48 border-r border-white/10 bg-bg-secondary/30 p-2 flex flex-col gap-1">
-          {tabs.map(tab => (
+        <div className="w-48 border-r border-white/10 bg-bg-secondary/30 p-2 flex flex-col gap-1 overflow-y-auto custom-scrollbar">
+          {visibleTabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -184,7 +325,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </div>
           )}
 
-          {/* GRAFO & CÉREBRO */}
+          {/* GRAFO */}
           {activeTab === 'graph' && (
             <div className="space-y-6">
               <h3 className="text-lg font-medium text-text-primary border-b border-white/10 pb-2 mb-4">Grafo & Cérebro 3D</h3>
@@ -305,7 +446,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </div>
           )}
 
-          {/* DADOS & SYNC */}
+          {/* DADOS */}
           {activeTab === 'data' && (
             <div className="space-y-6">
               <h3 className="text-lg font-medium text-text-primary border-b border-white/10 pb-2 mb-4">Dados & Sincronização</h3>
@@ -325,9 +466,17 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </div>
               </div>
 
-              <div className="pt-4">
-                <Button variant="secondary" onClick={handleExportBase} className="w-full sm:w-auto">
+              <div className="pt-4 flex gap-4">
+                <Button variant="secondary" onClick={handleExportBase}>
                   Exportar Base (JSON)
+                </Button>
+                <Button variant="ghost" onClick={async () => {
+                  try {
+                    await notesApi.bulkEmbed();
+                    toast.success('Re-embedding agendado para todas as notas.');
+                  } catch(e) {}
+                }}>
+                  Forçar Re-embedding (Tudo)
                 </Button>
               </div>
             </div>
@@ -345,14 +494,163 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     type="text"
                     value={displayName}
                     onChange={e => setDisplayName(e.target.value)}
-                    className="w-full bg-bg-tertiary border border-white/10 rounded p-2 text-sm focus:border-accent-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
+                    className="w-full bg-bg-tertiary border border-white/10 rounded p-2 text-sm focus:border-accent-primary"
                   />
                 </div>
-
-                <div className="pt-2 flex gap-2">
-                  <Button variant="primary" onClick={handleSaveProfile}>Salvar Perfil</Button>
-                  <Button variant="ghost" onClick={logout} className="text-red-400 hover:text-red-300">Logout</Button>
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1">Bio</label>
+                  <textarea
+                    value={bio}
+                    onChange={e => setBio(e.target.value)}
+                    className="w-full h-20 bg-bg-tertiary border border-white/10 rounded p-2 text-sm focus:border-accent-primary resize-none custom-scrollbar"
+                  />
                 </div>
+                <div className="pt-2 flex gap-2 border-b border-white/10 pb-6">
+                  <Button variant="primary" onClick={handleSaveProfile}>Salvar Perfil</Button>
+                  <Button variant="ghost" onClick={logout} className="text-red-400 hover:text-red-300 ml-auto">Sair da Conta</Button>
+                </div>
+
+                <div className="pt-2">
+                  <h4 className="text-sm font-medium mb-3">Trocar Senha</h4>
+                  <div className="space-y-3">
+                    <input
+                      type="password"
+                      placeholder="Senha atual"
+                      value={currentPassword}
+                      onChange={e => setCurrentPassword(e.target.value)}
+                      className="w-full bg-bg-tertiary border border-white/10 rounded p-2 text-sm focus:border-accent-primary"
+                    />
+                    <input
+                      type="password"
+                      placeholder="Nova senha"
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      className="w-full bg-bg-tertiary border border-white/10 rounded p-2 text-sm focus:border-accent-primary"
+                    />
+                    <Button variant="secondary" onClick={handleChangePassword}>Atualizar Senha</Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* OLLAMA */}
+          {activeTab === 'ollama' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-4">
+                <h3 className="text-lg font-medium text-text-primary">Servidor Ollama Local</h3>
+                <div className="flex items-center gap-2 text-sm">
+                  <div className={`w-2 h-2 rounded-full ${ollamaStatus?.status === 'online' ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <span className="text-text-secondary">{ollamaStatus?.status === 'online' ? `v${ollamaStatus.version}` : 'Offline'}</span>
+                </div>
+              </div>
+
+              {/* Install New Model */}
+              <div className="bg-bg-tertiary/30 p-4 rounded-lg border border-white/10">
+                <h4 className="text-sm font-medium mb-3">Instalar Modelo (Pull)</h4>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={pullModelName}
+                    onChange={e => setPullModelName(e.target.value)}
+                    placeholder="ex: mistral:instruct, nomic-embed-text"
+                    className="flex-1 bg-bg-tertiary border border-white/10 rounded p-2 text-sm focus:border-accent-primary"
+                  />
+                  <Button variant="primary" onClick={handlePullModel}>Download</Button>
+                </div>
+                {pullProgress && (
+                  <div className="mt-3 bg-bg-primary p-3 rounded text-xs font-mono text-text-secondary">
+                    {pullProgress.status} {pullProgress.completed && pullProgress.total && `(${Math.round(pullProgress.completed / pullProgress.total * 100)}%)`}
+                    {pullProgress.error && <span className="text-red-400 block mt-1">{pullProgress.error}</span>}
+                  </div>
+                )}
+              </div>
+
+              {/* Installed Models */}
+              <div>
+                <h4 className="text-sm font-medium mb-3">Modelos Instalados</h4>
+                <div className="grid grid-cols-1 gap-2">
+                  {ollamaModels.map(model => (
+                    <div key={model.name} className="bg-bg-tertiary/30 p-3 rounded-lg border border-white/5 flex items-center justify-between group">
+                      <div>
+                        <div className="text-sm font-medium text-text-primary flex items-center gap-2">
+                          {model.name}
+                          {model.is_chat_model && <span className="text-[9px] bg-accent-primary/20 text-accent-primary px-1.5 py-0.5 rounded-full uppercase">Chat Ativo</span>}
+                          {model.is_embed_model && <span className="text-[9px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full uppercase">Embed Ativo</span>}
+                        </div>
+                        <div className="text-xs text-text-muted mt-1">{model.size_gb} GB</div>
+                      </div>
+                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => handleUpdateActiveModel('chat', model.name)} className="text-[10px] bg-white/5 hover:bg-white/10 px-2 py-1 rounded text-text-secondary">Usar Chat</button>
+                        <button onClick={() => handleUpdateActiveModel('embed', model.name)} className="text-[10px] bg-white/5 hover:bg-white/10 px-2 py-1 rounded text-text-secondary">Usar Embed</button>
+                        <button onClick={() => handleDeleteModel(model.name)} className="text-[10px] bg-red-500/10 hover:bg-red-500/20 px-2 py-1 rounded text-red-400">🗑️</button>
+                      </div>
+                    </div>
+                  ))}
+                  {ollamaModels.length === 0 && <div className="text-xs text-text-muted">Nenhum modelo instalado.</div>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ADMIN */}
+          {activeTab === 'admin' && (
+            <div className="space-y-6">
+              <h3 className="text-lg font-medium text-text-primary border-b border-white/10 pb-2 mb-4">Administração</h3>
+
+              <div className="flex justify-between items-center">
+                <h4 className="text-sm font-medium">Usuários do Sistema</h4>
+                <Button variant="primary" size="sm" onClick={() => setShowNewUser(!showNewUser)}>
+                  {showNewUser ? 'Cancelar' : '+ Novo Usuário'}
+                </Button>
+              </div>
+
+              {showNewUser && (
+                <div className="bg-bg-tertiary/50 p-4 rounded-lg border border-white/10 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <input type="text" placeholder="Username (login)" value={newUsername} onChange={e => setNewUsername(e.target.value)} className="bg-bg-tertiary border border-white/10 rounded p-2 text-sm" />
+                    <input type="text" placeholder="Nome de Exibição" value={newUserName} onChange={e => setNewUserName(e.target.value)} className="bg-bg-tertiary border border-white/10 rounded p-2 text-sm" />
+                    <input type="password" placeholder="Senha" value={newUserPass} onChange={e => setNewUserPass(e.target.value)} className="bg-bg-tertiary border border-white/10 rounded p-2 text-sm" />
+                    <div className="flex items-center gap-2 pl-2">
+                      <input type="checkbox" checked={newUserAdmin} onChange={e => setNewUserAdmin(e.target.checked)} id="is_admin_check" />
+                      <label htmlFor="is_admin_check" className="text-sm text-text-secondary cursor-pointer">Admin?</label>
+                    </div>
+                  </div>
+                  <Button variant="primary" onClick={handleCreateUser} className="w-full">Criar Usuário</Button>
+                </div>
+              )}
+
+              <div className="w-full border border-white/10 rounded-lg overflow-hidden">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-bg-tertiary/50 border-b border-white/10 text-text-muted">
+                    <tr>
+                      <th className="px-4 py-2 font-medium">Login</th>
+                      <th className="px-4 py-2 font-medium">Nome</th>
+                      <th className="px-4 py-2 font-medium">Notas</th>
+                      <th className="px-4 py-2 font-medium">Role</th>
+                      <th className="px-4 py-2 font-medium">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {usersList.map(u => (
+                      <tr key={u.id} className="hover:bg-white/5 transition-colors">
+                        <td className="px-4 py-2 text-text-primary">{u.username}</td>
+                        <td className="px-4 py-2 text-text-secondary">{u.display_name}</td>
+                        <td className="px-4 py-2 text-text-muted">{u.note_count}</td>
+                        <td className="px-4 py-2">
+                          {u.is_admin ? (
+                            <span className="text-[10px] bg-accent-primary/20 text-accent-primary px-1.5 py-0.5 rounded uppercase font-bold">Admin</span>
+                          ) : (
+                            <span className="text-[10px] bg-white/10 text-text-muted px-1.5 py-0.5 rounded uppercase">User</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 flex gap-2">
+                          <button onClick={() => handleDeleteUser(u.id)} className="text-red-400 hover:text-red-300 text-xs" title="Excluir">🗑️</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

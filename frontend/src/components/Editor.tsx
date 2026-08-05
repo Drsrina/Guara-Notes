@@ -7,6 +7,8 @@ import { jsPDF } from 'jspdf'
 import Whiteboard from './Whiteboard'
 import Dataview from './Dataview'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useContextMenu } from './ContextMenu'
+import toast from 'react-hot-toast'
 
 interface EditorProps {
   noteId: string | null
@@ -26,6 +28,7 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
       document.removeEventListener(`export-pdf-${panelId}`, handleExportPdf)
     }
   }, [panelId])
+
   const { notes, upsertNote, toggleFocusMode } = useAppStore()
   const { getTagColor, addTag } = useTagsStore()
   const { settings } = useSettingsStore()
@@ -38,11 +41,13 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
   const [tags, setTags] = useState<string[]>([])
   const [newTag, setNewTag] = useState('')
   const [showTagPanel, setShowTagPanel] = useState(false)
-  const [_versions, setVersions] = useState<any[]>([])
-  const [_showVersions, setShowVersions] = useState(false)
-  const [viewMode] = useState<'markdown' | 'whiteboard' | 'dataview'>('markdown')
+  const [versions, setVersions] = useState<any[]>([])
+  const [showVersions, setShowVersions] = useState(false)
+  const [viewMode, setViewMode] = useState<'markdown' | 'whiteboard' | 'dataview'>('markdown')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const editorRef = useRef<HTMLDivElement>(null)
+  
+  const { open: openCtx, render: renderCtx } = useContextMenu()
 
   // Sync with note state
   useEffect(() => {
@@ -69,8 +74,7 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
     }
   }
 
-      // @ts-ignore
-  const _handleRestore = async (versionId: string) => {
+  const handleRestore = async (versionId: string) => {
     if (!noteId) return
     try {
       const res = await notesApi.restoreVersion(noteId, versionId)
@@ -92,6 +96,7 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
       setTimeout(() => setSaved(false), 2000)
       loadVersions()
     } catch (e) {
+      toast.error('Erro ao salvar nota')
     } finally {
       setSaving(false)
     }
@@ -132,11 +137,10 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
     scheduleAutosave(title, content, updatedTags)
   }
 
-  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current) }, [])
+  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current) }, [noteId])
 
-      // @ts-ignore
-  const _exportMD = () => {
-    const blob = new Blob([content], { type: 'text/markdown' })
+  const exportMD = () => {
+    const blob = new Blob([`# ${title || 'nota'}\n\n${content}`], { type: 'text/markdown' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -145,7 +149,7 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
     URL.revokeObjectURL(url)
   }
 
-      const _exportPDF = async () => {
+  const exportPDF = async () => {
     if (!editorRef.current) return
     const preview = editorRef.current.querySelector('.wmde-markdown') as HTMLElement
     if (!preview) return
@@ -171,13 +175,13 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
 
   return (
     <div className={`h-full flex relative overflow-hidden bg-bg-primary`} data-color-mode={settings.theme}>
-
       {/* Editor Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
 
         {/* Hidden buttons for external export trigger */}
-        <button id={`export-md-btn-${panelId}`} onClick={_exportMD} className="hidden" />
-        <button id={`export-pdf-btn-${panelId}`} onClick={_exportPDF} className="hidden" />
+        <button id={`export-md-btn-${panelId}`} onClick={exportMD} className="hidden" />
+        <button id={`export-pdf-btn-${panelId}`} onClick={exportPDF} className="hidden" />
+        
         {/* Topbar: Only show in regular mode, not in focus mode (handled by Layout/MainView) */}
         {!inFocusMode && (
           <div className="flex items-center justify-between px-6 py-3 border-b border-white/10 shrink-0">
@@ -193,6 +197,22 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
                 {saving ? '💾 Salvando...' : saved ? '✅ Salvo' : ''}
               </span>
 
+              {/* View Mode Toggle */}
+              <div className="flex bg-bg-tertiary rounded-md p-1 mr-2 border border-white/5">
+                {(['markdown', 'whiteboard', 'dataview'] as const).map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => setViewMode(mode)}
+                    className={`px-2 py-1 text-[10px] rounded uppercase font-bold tracking-wider transition-colors ${
+                      viewMode === mode ? 'bg-accent-primary/20 text-accent-primary' : 'text-text-muted hover:text-text-secondary'
+                    }`}
+                    title={`Modo ${mode}`}
+                  >
+                    {mode === 'markdown' ? 'MD' : mode === 'whiteboard' ? 'Wb' : 'Db'}
+                  </button>
+                ))}
+              </div>
+
               <button
                 onClick={() => setShowTagPanel(!showTagPanel)}
                 className={`px-3 py-1.5 text-xs rounded transition-colors flex items-center gap-1 ${showTagPanel ? 'bg-accent-primary/20 text-accent-primary' : 'bg-white/5 hover:bg-white/10 text-text-secondary'}`}
@@ -201,39 +221,54 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
               </button>
 
               <div className="relative">
-            <button
-              onClick={() => setShowVersions(!_showVersions)}
-              className="px-3 py-1.5 text-xs bg-white/5 hover:bg-white/10 text-text-secondary rounded transition-colors"
-              title="Histórico de Versões"
-            >
-              ⏱️
-            </button>
-            {_showVersions && (
-              <div className="absolute right-0 mt-2 w-64 glass-panel border border-accent-primary/20 rounded-md shadow-xl py-2 z-50">
-                <div className="px-3 pb-2 mb-2 border-b border-white/10 text-xs font-semibold text-accent-primary text-glow-neon">
-                  Histórico de Versões
-                </div>
-                {_versions.length === 0 ? (
-                  <div className="px-3 text-xs text-text-muted">Nenhum backup disponível.</div>
-                ) : (
-                  _versions.map((v) => (
-                    <div key={v.id} className="px-3 py-2 hover:bg-white/5 flex flex-col gap-1 transition-colors">
-                      <span className="text-xs text-text-primary truncate">{v.title}</span>
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-text-muted">{new Date(v.created_at).toLocaleString()}</span>
-                        <button 
-                          onClick={() => _handleRestore(v.id)}
-                          className="text-[10px] text-accent-primary hover:text-accent-glow"
-                        >
-                          Restaurar
-                        </button>
-                      </div>
+                <button
+                  onClick={() => setShowVersions(!showVersions)}
+                  className="px-3 py-1.5 text-xs bg-white/5 hover:bg-white/10 text-text-secondary rounded transition-colors"
+                  title="Histórico de Versões"
+                >
+                  ⏱️
+                </button>
+                {showVersions && (
+                  <div className="absolute right-0 mt-2 w-64 glass-panel border border-accent-primary/20 rounded-md shadow-xl py-2 z-50">
+                    <div className="px-3 pb-2 mb-2 border-b border-white/10 text-xs font-semibold text-accent-primary text-glow-neon">
+                      Histórico de Versões
                     </div>
-                  ))
+                    {versions.length === 0 ? (
+                      <div className="px-3 text-xs text-text-muted">Nenhum backup disponível.</div>
+                    ) : (
+                      versions.map((v) => (
+                        <div key={v.id} className="px-3 py-2 hover:bg-white/5 flex flex-col gap-1 transition-colors">
+                          <span className="text-xs text-text-primary truncate">{v.title}</span>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] text-text-muted">{new Date(v.created_at).toLocaleString()}</span>
+                            <button 
+                              onClick={() => handleRestore(v.id)}
+                              className="text-[10px] text-accent-primary hover:text-accent-glow"
+                            >
+                              Restaurar
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
+
+              <button
+                onClick={async () => {
+                  try {
+                    await notesApi.forceEmbed(noteId);
+                    toast.success('Re-embedding enfileirado para esta nota.');
+                  } catch(e) {
+                    toast.error('Erro ao forçar re-embedding');
+                  }
+                }}
+                className="px-3 py-1.5 text-xs bg-white/5 hover:bg-white/10 text-text-secondary rounded transition-colors"
+                title="Forçar Re-embedding"
+              >
+                🔄
+              </button>
 
               <button
                 onClick={toggleFocusMode}
@@ -258,7 +293,21 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
         )}
 
         {/* View Area */}
-        <div className={`flex-1 overflow-hidden relative ${settings.editorMaxWidth && inFocusMode ? 'max-w-4xl mx-auto w-full' : 'w-full'}`} ref={editorRef}>
+        <div 
+          className={`flex-1 overflow-hidden relative ${settings.editorMaxWidth && inFocusMode ? 'max-w-4xl mx-auto w-full' : 'w-full'}`} 
+          ref={editorRef}
+          onContextMenu={(e) => {
+            openCtx(e, [
+              { label: 'Formatação Básica', disabled: true },
+              { label: 'Negrito', icon: 'B', action: () => document.execCommand('bold') },
+              { label: 'Itálico', icon: 'I', action: () => document.execCommand('italic') },
+              { type: 'separator' },
+              { label: 'Inserir Wikilink', icon: '🔗', action: () => {
+                 document.execCommand('insertText', false, '[[]]');
+              }},
+            ]);
+          }}
+        >
           {viewMode === 'markdown' && (
             <MDEditor
               value={content}
@@ -331,7 +380,8 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
           </motion.div>
         )}
       </AnimatePresence>
-
+      
+      {renderCtx}
     </div>
   )
 }

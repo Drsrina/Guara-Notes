@@ -169,10 +169,16 @@ export const useTagsStore = create<TagsState>()(
 export type TabType = 'editor' | 'graph2d' | 'brain3d' | 'chat'
 export type SplitDirection = 'vertical' | 'horizontal'
 
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
 export interface PaneState {
   id: string
   activeTab: TabType
   activeNoteId: string | null
+  chatMessages: ChatMessage[]
 }
 
 interface WorkspaceState {
@@ -191,9 +197,10 @@ interface WorkspaceState {
   setSplitRatio: (ratio: number) => void
   setSidebarCollapsed: (v: boolean) => void
   toggleSidebar: () => void
+  setChatMessages: (paneId: string, messages: ChatMessage[]) => void
 }
 
-const defaultPanes: PaneState[] = [{ id: 'pane-1', activeTab: 'editor', activeNoteId: null }]
+const defaultPanes: PaneState[] = [{ id: 'pane-1', activeTab: 'editor', activeNoteId: null, chatMessages: [] }]
 
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
@@ -207,7 +214,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       addPane: () => {
         const { panes } = get()
         if (panes.length >= 4) return
-        const newPane: PaneState = { id: `pane-${Date.now()}`, activeTab: 'editor', activeNoteId: null }
+        const newPane: PaneState = { id: `pane-${Date.now()}`, activeTab: 'editor', activeNoteId: null, chatMessages: [] }
         set({ panes: [...panes, newPane], focusedPaneId: newPane.id })
       },
 
@@ -231,6 +238,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         })),
 
       setFocusedPane: (paneId) => set({ focusedPaneId: paneId }),
+
+      setChatMessages: (paneId, messages) =>
+        set((state) => ({
+          panes: state.panes.map(p => p.id === paneId ? { ...p, chatMessages: messages } : p)
+        })),
 
       openNoteInFocusedPane: (noteId) => {
         const { focusedPaneId, panes } = get()
@@ -258,14 +270,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 interface AppState {
   notes: Note[]
   folders: Folder[]
-  activeNoteId: string | null
   focusMode: boolean
   notesLoading: boolean
   foldersLoading: boolean
 
   setNotes: (notes: Note[]) => void
   setFolders: (folders: Folder[]) => void
-  setActiveNoteId: (id: string | null) => void
   setNotesLoading: (v: boolean) => void
   setFoldersLoading: (v: boolean) => void
   setFocusMode: (v: boolean) => void
@@ -280,14 +290,12 @@ interface AppState {
 export const useAppStore = create<AppState>((set) => ({
   notes: [],
   folders: [],
-  activeNoteId: null,
   focusMode: false,
   notesLoading: false,
   foldersLoading: false,
 
   setNotes: (notes) => set({ notes }),
   setFolders: (folders) => set({ folders }),
-  setActiveNoteId: (id) => set({ activeNoteId: id }),
   setNotesLoading: (v) => set({ notesLoading: v }),
   setFoldersLoading: (v) => set({ foldersLoading: v }),
   setFocusMode: (v) => set({ focusMode: v }),
@@ -303,7 +311,6 @@ export const useAppStore = create<AppState>((set) => ({
   removeNote: (id) =>
     set((state) => ({
       notes: state.notes.filter((n) => n.id !== id),
-      activeNoteId: state.activeNoteId === id ? null : state.activeNoteId,
     })),
 
   upsertFolder: (folder) =>

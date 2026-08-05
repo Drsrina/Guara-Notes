@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useAuthStore, useAppStore, useWorkspaceStore } from '../store'
 import { notesApi } from '../api/notes'
 import { foldersApi } from '../api/folders'
@@ -6,12 +6,14 @@ import { SettingsModal } from './SettingsModal'
 import { Button } from './ui/Button'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useContextMenu } from './ContextMenu'
+import { confirmDialog, promptDialog } from './ui/Dialogs'
+import toast from 'react-hot-toast'
 
 type SortKey = 'updated_at' | 'created_at' | 'title'
 
 export default function Sidebar() {
   const { user } = useAuthStore()
-  const { notes, folders, upsertNote, removeNote, upsertFolder, removeFolder, notesLoading } = useAppStore()
+  const { notes, folders, upsertNote, removeNote, upsertFolder, removeFolder, notesLoading, foldersLoading } = useAppStore()
   const { sidebarCollapsed: isCollapsed, setSidebarCollapsed: setIsCollapsed, openNoteInFocusedPane } = useWorkspaceStore()
   const [showSettings, setShowSettings] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>('updated_at')
@@ -29,22 +31,29 @@ export default function Sidebar() {
     })
   }, [notes, searchResults, sortKey])
 
-  const handleSearch = useCallback(async (q: string) => {
+  const handleSearch = useCallback((q: string) => {
     setSearchQuery(q)
     if (!q.trim()) {
       setSearchResults(null)
       return
     }
     setSearching(true)
-    try {
-      const res = await notesApi.search(q, 'hybrid', 30)
-      setSearchResults(res.data as any)
-    } catch {
-      setSearchResults(null)
-    } finally {
-      setSearching(false)
-    }
   }, [])
+
+  useEffect(() => {
+    if (!searchQuery.trim()) return
+    const timer = setTimeout(async () => {
+      try {
+        const res = await notesApi.search(searchQuery, 'hybrid', 30)
+        setSearchResults(res.data as any)
+      } catch {
+        setSearchResults(null)
+      } finally {
+        setSearching(false)
+      }
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   const handleNewNote = async () => {
     try {
@@ -58,54 +67,60 @@ export default function Sidebar() {
   }
 
   const handleNewFolder = async () => {
-    const name = prompt('Nome da pasta:')
-    if (!name) return
-    try {
-      const res = await foldersApi.create({ name })
-      upsertFolder(res.data)
-    } catch (e) {
-      console.error('Erro ao criar pasta', e)
-    }
+    promptDialog('Nova Pasta', '', async (name) => {
+      if (!name) return
+      try {
+        const res = await foldersApi.create({ name })
+        upsertFolder(res.data)
+      } catch (e) {
+        toast.error('Erro ao criar pasta')
+      }
+    })
   }
 
   const handleDeleteNote = async (id: string) => {
-    if (!confirm('Excluir esta nota?')) return
-    try {
-      await notesApi.delete(id)
-      removeNote(id)
-    } catch (e) {
-      console.error('Erro ao excluir nota', e)
-    }
+    confirmDialog('Excluir Nota', 'Tem certeza que deseja excluir esta nota?', async () => {
+      try {
+        await notesApi.delete(id)
+        removeNote(id)
+        toast.success('Nota excluída')
+      } catch (e) {
+        toast.error('Erro ao excluir nota')
+      }
+    })
   }
 
   const handleDeleteFolder = async (id: string) => {
-    if (!confirm('Excluir esta pasta e todas as notas dentro dela?')) return
-    try {
-      await foldersApi.delete(id)
-      removeFolder(id)
-    } catch (e) {
-      console.error('Erro ao excluir pasta', e)
-    }
+    confirmDialog('Excluir Pasta', 'Excluir esta pasta e todas as notas dentro dela?', async () => {
+      try {
+        await foldersApi.delete(id)
+        removeFolder(id)
+        toast.success('Pasta excluída')
+      } catch (e) {
+        toast.error('Erro ao excluir pasta')
+      }
+    })
   }
 
   const handleForceEmbed = async (noteId: string, noteTitle: string) => {
     try {
       await notesApi.forceEmbed(noteId)
-      alert(`Re-embedding enfileirado para "${noteTitle}"`)
+      toast.success(`Re-embedding enfileirado para "${noteTitle}"`)
     } catch (e) {
-      console.error('Erro ao enfileirar embedding', e)
+      toast.error('Erro ao enfileirar embedding')
     }
   }
 
   const handleRenameNote = async (noteId: string, currentTitle: string) => {
-    const newTitle = prompt('Novo título:', currentTitle)
-    if (!newTitle || newTitle === currentTitle) return
-    try {
-      const res = await notesApi.update(noteId, { title: newTitle })
-      upsertNote(res.data)
-    } catch (e) {
-      console.error('Erro ao renomear nota', e)
-    }
+    promptDialog('Renomear Nota', currentTitle, async (newTitle) => {
+      if (!newTitle || newTitle === currentTitle) return
+      try {
+        const res = await notesApi.update(noteId, { title: newTitle })
+        upsertNote(res.data)
+      } catch (e) {
+        toast.error('Erro ao renomear nota')
+      }
+    })
   }
 
   const handleDuplicateNote = async (noteId: string) => {
@@ -136,14 +151,15 @@ export default function Sidebar() {
   }
 
   const handleRenameFolder = async (folderId: string, currentName: string) => {
-    const newName = prompt('Novo nome:', currentName)
-    if (!newName || newName === currentName) return
-    try {
-      const res = await foldersApi.update(folderId, { name: newName })
-      upsertFolder(res.data)
-    } catch (e) {
-      console.error('Erro ao renomear pasta', e)
-    }
+    promptDialog('Renomear Pasta', currentName, async (newName) => {
+      if (!newName || newName === currentName) return
+      try {
+        const res = await foldersApi.update(folderId, { name: newName })
+        upsertFolder(res.data)
+      } catch (e) {
+        toast.error('Erro ao renomear pasta')
+      }
+    })
   }
 
   const getNoteContextItems = (note: typeof notes[0]) => [
@@ -252,19 +268,19 @@ export default function Sidebar() {
                   className="w-full bg-bg-tertiary/60 border border-white/8 rounded-md px-3 py-1.5 text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary/50 transition-colors"
                 />
                 {searching && (
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-accent-primary animate-pulse">...</span>
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-accent-primary animate-pulse">...</span>
                 )}
                 {searchQuery && (
                   <button
                     onClick={() => { setSearchQuery(''); setSearchResults(null) }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-[10px]"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-[11px]"
                   >
                     ✕
                   </button>
                 )}
               </div>
               {searchResults !== null && (
-                <div className="mt-1 text-[10px] text-text-muted">
+                <div className="mt-1 text-[11px] text-text-muted">
                   {searchResults.length} resultado(s)
                 </div>
               )}
@@ -276,7 +292,7 @@ export default function Sidebar() {
                 <button
                   key={k}
                   onClick={() => setSortKey(k)}
-                  className={`text-[10px] px-2 py-1 rounded transition-colors uppercase tracking-wider font-semibold ${sortKey === k ? 'bg-accent-primary/20 text-accent-primary' : 'text-text-muted hover:text-text-secondary'}`}
+                  className={`text-[11px] px-2 py-1 rounded transition-colors uppercase tracking-wider font-semibold ${sortKey === k ? 'bg-accent-primary/20 text-accent-primary' : 'text-text-muted hover:text-text-secondary'}`}
                 >
                   {k === 'updated_at' ? 'Edição' : k === 'created_at' ? 'Criação' : 'Nome'}
                 </button>
@@ -285,8 +301,8 @@ export default function Sidebar() {
 
             {/* Árvore */}
             <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-              {notesLoading && (
-                <div className="text-text-muted text-xs text-center py-4">Carregando...</div>
+              {(notesLoading || foldersLoading) && (
+                <div className="text-text-muted text-xs text-center py-4 animate-pulse">Carregando...</div>
               )}
 
               {/* Modo busca: lista plana */}
@@ -377,7 +393,7 @@ export default function Sidebar() {
                       } catch {}
                     }}
                   >
-                    <div className="text-[10px] text-text-muted uppercase tracking-widest font-bold px-2 py-1 mb-1">Sem pasta</div>
+                    <div className="text-[11px] text-text-muted uppercase tracking-widest font-bold px-2 py-1 mb-1">Sem pasta</div>
                     {sortedNotes.filter(n => n.folder_id === null).map(note => (
                       <NoteItem
                         key={note.id}
@@ -395,7 +411,7 @@ export default function Sidebar() {
         )}
 
         {/* Footer */}
-        <div className="p-3 border-t border-white/10 bg-bg-secondary/50 text-[10px] text-text-muted flex items-center justify-between flex-shrink-0">
+        <div className="p-3 border-t border-white/10 bg-bg-secondary/50 text-[11px] text-text-muted flex items-center justify-between flex-shrink-0">
           {!isCollapsed ? (
             <>
               <div className="flex items-center gap-2">

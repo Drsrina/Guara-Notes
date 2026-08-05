@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { aiApi } from '../api/ai'
-import { useAppStore } from '../store'
+import { useWorkspaceStore } from '../store'
 
 type Scope = 'note' | 'folder' | 'database'
 
@@ -11,18 +11,30 @@ interface Message {
 
 interface AIChatProps {
   inline?: boolean
+  noteId?: string | null
+  paneId?: string
 }
 
-export default function AIChat({ inline = false }: AIChatProps) {
-  const { activeNoteId } = useAppStore()
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Olá! Sou o Guará 🐺 — seu companion de escrita com IA. Como posso ajudar?' }
-  ])
+export default function AIChat({ inline = false, noteId, paneId }: AIChatProps) {
+  const { panes, setChatMessages } = useWorkspaceStore()
+  const pane = panes.find(p => p.id === paneId)
+  
+  const [messages, setMessages] = useState<Message[]>(
+    pane?.chatMessages?.length ? pane.chatMessages : [
+      { role: 'assistant', content: 'Olá! Sou o Guará 🐺 — seu companion de escrita com IA. Como posso ajudar?' }
+    ]
+  )
   const [input, setInput] = useState('')
   const [scope, setScope] = useState<Scope>('database')
   const [loading, setLoading] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (paneId) {
+      setChatMessages(paneId, messages)
+    }
+  }, [messages, paneId, setChatMessages])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -39,7 +51,7 @@ export default function AIChat({ inline = false }: AIChatProps) {
       const res = await aiApi.chat({
         message: userMsg,
         scope,
-        scope_ref_id: scope === 'note' ? activeNoteId : null,
+        scope_ref_id: scope === 'note' ? noteId : null,
         session_id: sessionId,
       })
       setSessionId(res.data.session_id)
