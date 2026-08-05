@@ -172,6 +172,7 @@ export type SplitDirection = 'vertical' | 'horizontal'
 export interface PaneState {
   id: string
   activeTab: TabType
+  activeNoteId: string | null
 }
 
 interface WorkspaceState {
@@ -179,16 +180,20 @@ interface WorkspaceState {
   splitDir: SplitDirection
   splitRatio: number // 0.0–1.0
   sidebarCollapsed: boolean
+  focusedPaneId: string | null
   addPane: () => void
   removePane: (id: string) => void
   setActiveTab: (paneId: string, tab: TabType) => void
+  setActiveNoteInPane: (paneId: string, noteId: string | null) => void
+  setFocusedPane: (paneId: string) => void
+  openNoteInFocusedPane: (noteId: string) => void
   setSplitDir: (dir: SplitDirection) => void
   setSplitRatio: (ratio: number) => void
   setSidebarCollapsed: (v: boolean) => void
   toggleSidebar: () => void
 }
 
-const defaultPanes: PaneState[] = [{ id: 'pane-1', activeTab: 'editor' }]
+const defaultPanes: PaneState[] = [{ id: 'pane-1', activeTab: 'editor', activeNoteId: null }]
 
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
@@ -197,23 +202,47 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       splitDir: 'vertical',
       splitRatio: 0.5,
       sidebarCollapsed: false,
+      focusedPaneId: 'pane-1',
 
       addPane: () => {
         const { panes } = get()
-        if (panes.length >= 2) return
-        set({ panes: [...panes, { id: `pane-${Date.now()}`, activeTab: 'editor' }] })
+        if (panes.length >= 4) return
+        const newPane: PaneState = { id: `pane-${Date.now()}`, activeTab: 'editor', activeNoteId: null }
+        set({ panes: [...panes, newPane], focusedPaneId: newPane.id })
       },
 
       removePane: (id) => {
-        const { panes } = get()
+        const { panes, focusedPaneId } = get()
         if (panes.length <= 1) return
-        set({ panes: panes.filter(p => p.id !== id) })
+        const newPanes = panes.filter(p => p.id !== id)
+        set({ panes: newPanes, focusedPaneId: focusedPaneId === id ? newPanes[0].id : focusedPaneId })
       },
 
       setActiveTab: (paneId, tab) =>
         set((state) => ({
-          panes: state.panes.map(p => p.id === paneId ? { ...p, activeTab: tab } : p)
+          panes: state.panes.map(p => p.id === paneId ? { ...p, activeTab: tab } : p),
+          focusedPaneId: paneId,
         })),
+
+      setActiveNoteInPane: (paneId, noteId) =>
+        set((state) => ({
+          panes: state.panes.map(p => p.id === paneId ? { ...p, activeNoteId: noteId } : p),
+          focusedPaneId: paneId,
+        })),
+
+      setFocusedPane: (paneId) => set({ focusedPaneId: paneId }),
+
+      openNoteInFocusedPane: (noteId) => {
+        const { focusedPaneId, panes } = get()
+        const targetId = focusedPaneId || panes[0]?.id
+        if (!targetId) return
+        set((state) => ({
+          panes: state.panes.map(p =>
+            p.id === targetId ? { ...p, activeNoteId: noteId, activeTab: 'editor' } : p
+          ),
+          focusedPaneId: targetId,
+        }))
+      },
 
       setSplitDir: (dir) => set({ splitDir: dir }),
       setSplitRatio: (ratio) => set({ splitRatio: Math.min(0.8, Math.max(0.2, ratio)) }),

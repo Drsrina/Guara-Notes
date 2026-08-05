@@ -1,4 +1,5 @@
 import os
+import logging
 import asyncio
 import httpx
 import numpy as np
@@ -7,6 +8,8 @@ from .database import AsyncSessionLocal
 from .models import Note, NoteLink, LinkType
 from sqlalchemy.future import select
 from sqlalchemy import delete, text, update
+
+logger = logging.getLogger(__name__)
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 EMBED_MODEL = os.getenv("OLLAMA_MODEL_EMBED", "nomic-embed-text")
@@ -33,7 +36,7 @@ async def _generate_embedding(text: str) -> list[float]:
             response.raise_for_status()
             return response.json().get("embedding", [])
         except Exception as e:
-            print(f"[embedding] Erro ao chamar Ollama: {e}")
+            logger.error(f"[embedding] Erro ao chamar Ollama: {e}")
             return []
 
 
@@ -44,7 +47,7 @@ async def _process_note_embedding(note_id: str):
         note = result.scalars().first()
 
         if not note:
-            print(f"[embedding] Nota {note_id} não encontrada.")
+            logger.warning(f"[embedding] Nota {note_id} não encontrada.")
             return
 
         text_to_embed = f"{note.title}\n{note.content}"
@@ -53,11 +56,11 @@ async def _process_note_embedding(note_id: str):
         if embedding:
             note.embedding = embedding
             await session.commit()
-            print(f"[embedding] ✅ Nota {note_id} vetorizada.")
+            logger.info(f"[embedding] ✅ Nota {note_id} vetorizada ({len(embedding)} dims).")
             # Dispara recálculo de links semânticos
             calculate_semantic_links.delay(note_id)
         else:
-            print(f"[embedding] ❌ Falhou para nota {note_id}.")
+            logger.error(f"[embedding] ❌ Falhou para nota {note_id}.")
 
 
 async def _calculate_semantic_links(note_id: str):
@@ -70,7 +73,7 @@ async def _calculate_semantic_links(note_id: str):
         source_note = result.scalars().first()
 
         if not source_note or source_note.embedding is None:
-            print(f"[semantic] Nota {note_id} sem embedding — pulando.")
+            logger.warning(f"[semantic] Nota {note_id} sem embedding — pulando.")
             return
 
         # Remove links semânticos antigos desta nota como origem
@@ -82,7 +85,6 @@ async def _calculate_semantic_links(note_id: str):
         )
 
         # Busca as K notas mais próximas via pgvector (mesmo usuário, exceto a própria nota)
-        # A coluna embedding usa o tipo vector do pgvector; <=> = cosine distance
         similar_query = text("""
             SELECT id, (embedding <=> CAST(:vec AS vector)) AS dist
             FROM notes
@@ -108,7 +110,7 @@ async def _calculate_semantic_links(note_id: str):
         for row in similar:
             dist = float(row.dist)
             if dist < SEMANTIC_THRESHOLD:
-                weight = round(1.0 - dist, 4)  # 0 = sem similitude, 1 = idêntico
+                weight = round(1.0 - dist, 4)
                 new_links.append(
                     NoteLink(
                         source_note_id=source_note.id,
@@ -122,7 +124,7 @@ async def _calculate_semantic_links(note_id: str):
             session.add_all(new_links)
 
         await session.commit()
-        print(f"[semantic] ✅ {len(new_links)} links semânticos para nota {note_id}.")
+        logger.info(f"[semantic] ✅ {len(new_links)} links semânticos para nota {note_id}.")
 
         # Dispara recálculo das coordenadas UMAP do usuário
         calculate_umap_coordinates.delay(str(source_note.user_id))
@@ -133,7 +135,7 @@ async def _calculate_umap_coordinates(user_id: str):
     Reduz embeddings para 3D com UMAP e persiste umap_x/y/z em cada nota.
     Requer ao menos 3 notas com embedding.
     """
-    print(f"[umap] Calculando coordenadas 3D para usuário {user_id}...")
+    logger.info(f"[umap] Calculando coordenadas 3D para usuário {user_id}...")
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             select(Note)
@@ -142,7 +144,7 @@ async def _calculate_umap_coordinates(user_id: str):
         notes = result.scalars().all()
 
         if len(notes) < 3:
-            print(f"[umap] Notas insuficientes ({len(notes)}) — mínimo 3.")
+            logger.warning(f"[umap] Notas insuficientes ({len(notes)}) — mínimo 3.")
             return
 
         import umap
@@ -172,9 +174,9 @@ async def _calculate_umap_coordinates(user_id: str):
                     )
                 )
             await session.commit()
-            print(f"[umap] ✅ {len(notes)} notas com coordenadas 3D atualizadas.")
+            logger.info(f"[umap] ✅ {len(notes)} notas com coordenadas 3D atualizadas.")
         except Exception as e:
-            print(f"[umap] ❌ Erro no UMAP: {e}")
+            logger.exception(f"[umap] ❌ Erro no UMAP: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -186,6 +188,7 @@ def generate_embeddings(self, note_id: str):
     try:
         asyncio.run(_process_note_embedding(note_id))
     except Exception as exc:
+        logger.error(f"[embedding] Task falhou para nota {note_id}: {exc}")
         raise self.retry(exc=exc, countdown=10)
 
 
@@ -194,6 +197,7 @@ def calculate_semantic_links(self, note_id: str):
     try:
         asyncio.run(_calculate_semantic_links(note_id))
     except Exception as exc:
+        logger.error(f"[semantic] Task falhou para nota {note_id}: {exc}")
         raise self.retry(exc=exc, countdown=10)
 
 
@@ -202,4 +206,5 @@ def calculate_umap_coordinates(self, user_id: str):
     try:
         asyncio.run(_calculate_umap_coordinates(user_id))
     except Exception as exc:
+        logger.error(f"[umap] Task falhou para usuário {user_id}: {exc}")
         raise self.retry(exc=exc, countdown=30)

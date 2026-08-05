@@ -33,9 +33,23 @@ export interface NoteVersion {
   created_at: string
 }
 
+export interface NoteSearchResult extends Note {
+  score: number
+}
+
+export interface PaginatedNotes {
+  items: Note[]
+  total: number
+  limit: number
+  offset: number
+}
+
 export const notesApi = {
-  list: (folder_id?: string) =>
-    api.get<Note[]>('/notes/', { params: folder_id ? { folder_id } : undefined }),
+  list: (params?: { folder_id?: string; limit?: number; offset?: number }) =>
+    api.get<PaginatedNotes>('/notes/', { params }),
+
+  search: (q: string, mode: 'text' | 'semantic' | 'hybrid' = 'hybrid', limit = 20, folder_id?: string) =>
+    api.get<NoteSearchResult[]>('/notes/search', { params: { q, mode, limit, folder_id } }),
 
   get: (id: string) => api.get<Note>(`/notes/${id}`),
 
@@ -48,4 +62,8 @@ export const notesApi = {
   getVersions: (id: string) => api.get<NoteVersion[]>(`/notes/${id}/versions`),
 
   restoreVersion: (id: string, versionId: string) => api.post<Note>(`/notes/${id}/restore/${versionId}`),
+
+  forceEmbed: (id: string) => api.post(`/notes/${id}/embed`),
+
+  bulkEmbed: () => api.post('/notes/bulk-embed'),
 }

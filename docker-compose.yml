@@ -60,6 +60,7 @@ services:
       - OLLAMA_MODEL_EMBED=${OLLAMA_MODEL_EMBED:-nomic-embed-text}
       - SEMANTIC_THRESHOLD=${SEMANTIC_THRESHOLD:-0.35}
       - SEMANTIC_TOP_K=${SEMANTIC_TOP_K:-8}
+      - NOTE_MAX_VERSIONS=${NOTE_MAX_VERSIONS:-50}
     depends_on:
       redis:
         condition: service_started
@@ -68,7 +69,14 @@ services:
       ollama:
         condition: service_started
         required: false   # não bloqueia se AI_PROVIDER != local
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A backend.worker.celery_app inspect ping -d celery@$$HOSTNAME --timeout 5 || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
+
 
   postgres:
     image: ankane/pgvector:v0.5.1

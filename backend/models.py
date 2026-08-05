@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 import enum
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Float, Enum
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Float, Enum, Boolean
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 from sqlalchemy.orm import relationship
 from pgvector.sqlalchemy import Vector
@@ -37,8 +37,10 @@ class User(Base):
     avatar_url = Column(String, nullable=True)
     bio = Column(Text, nullable=True)
     theme_prefs = Column(JSONB, default=dict)
+    is_admin = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), default=_now)
     updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
+
 
 
 class Folder(Base):
