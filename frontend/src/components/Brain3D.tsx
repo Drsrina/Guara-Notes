@@ -1,9 +1,8 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import ForceGraph3D from 'react-force-graph-3d'
 import { graphApi, type GraphNode } from '../api/graph'
-import { useAppStore } from '../store'
+import { useAppStore, useTagsStore, useSettingsStore } from '../store'
 
-// Função para calcular a similaridade de cosseno entre dois vetores (embeddings)
 function cosineSim(vecA: number[], vecB: number[]) {
   let dotProduct = 0
   let normA = 0
@@ -22,24 +21,28 @@ export default function Brain3D() {
   const [links, setLinks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [ready, setReady] = useState(false)
-  const [similarityThreshold, setSimilarityThreshold] = useState(0.70)
-  const { setActiveNoteId } = useAppStore()
+  const { setActiveNoteId, notes } = useAppStore()
+  const { getTagColor } = useTagsStore()
+  const { settings, updateSettings } = useSettingsStore()
   const fgRef = useRef<any>(null)
 
   const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight })
 
   useEffect(() => {
-    const handleResize = () => {
-      // Pequeno ajuste para garantir que o flex-1 ocupe o espaço correto
-      const container = document.getElementById('brain-container')
-      if (container) {
-        setDimensions({ width: container.clientWidth, height: container.clientHeight })
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setDimensions({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height
+        })
       }
+    })
+
+    const container = document.getElementById('brain-container')
+    if (container) {
+       observer.observe(container)
     }
-    window.addEventListener('resize', handleResize)
-    // Chamada inicial
-    setTimeout(handleResize, 100)
-    return () => window.removeEventListener('resize', handleResize)
+    return () => observer.disconnect()
   }, [])
 
   useEffect(() => {
@@ -54,31 +57,31 @@ export default function Brain3D() {
 
   useEffect(() => {
     if (!nodes || nodes.length === 0) return
-
     const newLinks: any[] = []
     
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        const nodeA = nodes[i]
-        const nodeB = nodes[j]
-        
-        // Verifica as propriedades de array (pgvector retorna float array)
-        if ((nodeA as any).embedding && (nodeB as any).embedding && Array.isArray((nodeA as any).embedding) && Array.isArray((nodeB as any).embedding)) {
-          const sim = cosineSim((nodeA as any).embedding, (nodeB as any).embedding)
-          
-          if (sim >= similarityThreshold) {
-            newLinks.push({
-              source: nodeA.id,
-              target: nodeB.id,
-              similarity: sim
-            })
+    if (settings.renderSemantic) {
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const nodeA = nodes[i]
+          const nodeB = nodes[j]
+          if ((nodeA as any).embedding && (nodeB as any).embedding && Array.isArray((nodeA as any).embedding) && Array.isArray((nodeB as any).embedding)) {
+            const sim = cosineSim((nodeA as any).embedding, (nodeB as any).embedding)
+            if (sim >= settings.semanticThreshold) {
+              newLinks.push({ source: nodeA.id, target: nodeB.id, similarity: sim })
+            }
           }
         }
       }
     }
-    
     setLinks(newLinks)
-  }, [nodes, similarityThreshold])
+  }, [nodes, settings.semanticThreshold, settings.renderSemantic])
+
+  const processedNodes = useMemo(() => {
+    return nodes.map(n => {
+      const note = notes.find(note => note.id === n.id)
+      return { ...n, tags: note?.tags || [] }
+    }).filter(n => settings.hideEmptyNotes ? n.has_embedding : true)
+  }, [nodes, notes, settings.hideEmptyNotes])
 
   const handleZoomIn = () => {
     if (fgRef.current) {
@@ -94,62 +97,70 @@ export default function Brain3D() {
     }
   }
 
-  const handleCenter = () => {
-    if (fgRef.current) {
-      fgRef.current.zoomToFit(400, 50)
+  const handleCenter = () => fgRef.current?.zoomToFit(400, 50)
+
+  const getNodeColor = (node: any) => {
+    if (!node.has_embedding) return '#555555'
+    if (settings.colorMode === 'tag' && node.tags && node.tags.length > 0) {
+      return getTagColor(node.tags[0])
     }
+    return '#FF6B1A'
   }
 
   return (
-    <div id="brain-container" className="w-full h-full bg-zinc-950 relative flex overflow-hidden">
-      <div className="absolute top-4 left-4 z-10 glass-panel px-4 py-3 rounded-lg text-sm text-zinc-200 flex flex-col gap-3 min-w-[250px] shadow-lg box-glow-neon border border-guara-neon/20">
-        <div className="flex items-center justify-between">
-          <span className="font-semibold text-guara-neon tracking-wide drop-shadow-[0_0_8px_rgba(255,107,26,0.8)]">Cérebro Semântico</span>
-          {loading && <span className="text-zinc-500 text-xs animate-pulse">carregando...</span>}
+    <div id="brain-container" className="w-full h-full bg-bg-primary relative flex overflow-hidden">
+      <div className="absolute top-4 left-4 z-10 glass-panel px-4 py-3 rounded-lg text-sm text-text-primary flex flex-col gap-3 min-w-[250px]">
+        <div className="flex items-center justify-between border-b border-white/5 pb-2">
+          <span className="font-semibold text-accent-primary tracking-wide text-glow-neon">Cérebro Semântico</span>
+          {loading && <span className="text-text-muted text-xs animate-pulse">carregando...</span>}
         </div>
         
         {!loading && (
           <div className="flex flex-col gap-1">
-            <span className={`text-xs ${ready ? 'text-zinc-300' : 'text-zinc-500'}`}>
-              {nodes.length} notas ({nodes.filter(n => n.has_embedding).length} vetorizadas)
+            <span className={`text-xs ${ready ? 'text-text-secondary' : 'text-text-muted'}`}>
+              {processedNodes.length} notas ({processedNodes.filter(n => n.has_embedding).length} vetorizadas)
             </span>
-            <span className="text-xs text-zinc-400">
-              {links.length} conexões semânticas
-            </span>
+            {settings.renderSemantic && (
+              <span className="text-xs text-text-muted">
+                {links.length} conexões semânticas
+              </span>
+            )}
           </div>
         )}
         
-        <div className="mt-2 flex flex-col gap-2">
-          <div className="flex justify-between items-center text-xs text-zinc-400">
-            <span>Sensibilidade</span>
-            <span className="text-guara-neon font-mono">{(similarityThreshold * 100).toFixed(0)}%</span>
+        {settings.renderSemantic && (
+          <div className="mt-2 flex flex-col gap-2">
+            <div className="flex justify-between items-center text-xs text-text-muted">
+              <span>Sensibilidade (RAG)</span>
+              <span className="text-accent-primary font-mono">{(settings.semanticThreshold * 100).toFixed(0)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0.50"
+              max="0.99"
+              step="0.01"
+              value={settings.semanticThreshold}
+              onChange={(e) => updateSettings({ semanticThreshold: parseFloat(e.target.value) })}
+              className="w-full accent-accent-primary cursor-pointer"
+            />
           </div>
-          <input 
-            type="range" 
-            min="0.50" 
-            max="0.99" 
-            step="0.01" 
-            value={similarityThreshold} 
-            onChange={(e) => setSimilarityThreshold(parseFloat(e.target.value))}
-            className="w-full accent-guara-neon cursor-pointer"
-          />
-        </div>
+        )}
       </div>
 
       {!ready && !loading && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 glass-panel px-6 py-3 rounded-lg text-sm text-zinc-400 text-center max-w-sm shadow-xl border border-white/5 backdrop-blur-md">
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 glass-panel px-6 py-3 rounded-lg text-sm text-text-muted text-center max-w-sm">
           💡 Crie e edite notas para iniciar o processamento de embeddings. O cérebro revelará conexões ocultas.
         </div>
       )}
 
-      <div className="absolute bottom-6 right-6 z-10 flex flex-col gap-2 glass-panel p-2 rounded-lg box-glow-neon border border-guara-neon/20">
-        <button onClick={handleZoomIn} className="w-8 h-8 flex items-center justify-center bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded transition-colors text-lg" title="Aproximar">
+      <div className="absolute bottom-6 right-6 z-10 flex flex-col gap-2 glass-panel p-2 rounded-lg">
+        <button onClick={handleZoomIn} className="w-8 h-8 flex items-center justify-center bg-bg-tertiary hover:bg-white/10 text-text-primary rounded transition-colors text-lg" title="Aproximar">
           +
         </button>
-        <button onClick={handleZoomOut} className="w-8 h-8 flex items-center justify-center bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded transition-colors text-lg" title="Afastar">
+        <button onClick={handleZoomOut} className="w-8 h-8 flex items-center justify-center bg-bg-tertiary hover:bg-white/10 text-text-primary rounded transition-colors text-lg" title="Afastar">
           −
         </button>
-        <button onClick={handleCenter} className="w-8 h-8 flex items-center justify-center bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded transition-colors text-sm" title="Centralizar Cérebro">
+        <button onClick={handleCenter} className="w-8 h-8 flex items-center justify-center bg-bg-tertiary hover:bg-white/10 text-text-primary rounded transition-colors text-sm" title="Centralizar Cérebro">
           🎯
         </button>
       </div>
@@ -159,15 +170,15 @@ export default function Brain3D() {
           ref={fgRef}
           width={dimensions.width}
           height={dimensions.height}
-          graphData={{ nodes, links }}
+          graphData={{ nodes: processedNodes, links }}
           nodeLabel="title"
-          nodeColor={(node: any) => node.has_embedding ? '#FF6B1A' : '#555555'}
+          nodeColor={getNodeColor}
           nodeResolution={16}
           linkColor={() => 'rgba(255, 107, 26, 0.4)'}
           linkWidth={1.5}
           linkOpacity={0.6}
           onNodeClick={(node: any) => setActiveNoteId(node.id)}
-          backgroundColor="#09090b"
+          backgroundColor="#0F0F1E"
           enableNodeDrag={false}
           showNavInfo={false}
         />

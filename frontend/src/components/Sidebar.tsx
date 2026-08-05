@@ -1,46 +1,34 @@
-import { useState } from 'react'
-import { useAppStore, useAuthStore } from '../store'
+import { useState, useMemo } from 'react'
+import { useAuthStore, useAppStore } from '../store'
 import { notesApi } from '../api/notes'
 import { foldersApi } from '../api/folders'
+import { SettingsModal } from './SettingsModal'
+import { Button } from './ui/Button'
+import { motion, AnimatePresence } from 'framer-motion'
 
 type SortKey = 'updated_at' | 'created_at' | 'title'
 
 export default function Sidebar() {
+  const { user } = useAuthStore()
   const { notes, folders, activeNoteId, setActiveNoteId, upsertNote, removeNote, upsertFolder, notesLoading } = useAppStore()
-  const { logout, user, setUser } = useAuthStore()
+  const [showSettings, setShowSettings] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>('updated_at')
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
-  const [showSettings, setShowSettings] = useState(false)
-  const [aiProvider, setAiProvider] = useState<string>((user?.theme_prefs as any)?.ai_provider || 'local')
+  const [isCollapsed, setIsCollapsed] = useState(false)
 
-  const handleSaveSettings = async () => {
-    try {
-      // Mock da chamada da API se api/auth.ts não tiver método update, depois atualizamos lá também.
-      // fetch PUT /api/auth/users/me
-      const token = useAuthStore.getState().token
-      const res = await fetch('/api/auth/users/me', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ theme_prefs: { ...(user?.theme_prefs || {}), ai_provider: aiProvider } })
-      })
-      const data = await res.json()
-      setUser(data)
-      setShowSettings(false)
-    } catch (e) {
-      console.error('Erro ao salvar configurações', e)
-    }
-  }
-
-  const sortedNotes = [...notes].sort((a, b) => {
-    if (sortKey === 'title') return a.title.localeCompare(b.title)
-    return new Date(b[sortKey]).getTime() - new Date(a[sortKey]).getTime()
-  })
+  const sortedNotes = useMemo(() => {
+    return [...notes].sort((a, b) => {
+      if (sortKey === 'title') return a.title.localeCompare(b.title)
+      return new Date(b[sortKey]).getTime() - new Date(a[sortKey]).getTime()
+    })
+  }, [notes, sortKey])
 
   const handleNewNote = async () => {
     try {
       const res = await notesApi.create({ title: 'Nova Nota', content: '' })
       upsertNote(res.data)
       setActiveNoteId(res.data.id)
+      if (isCollapsed) setIsCollapsed(false)
     } catch (e) {
       console.error('Erro ao criar nota', e)
     }
@@ -77,76 +65,140 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-64 glass flex flex-col h-full border-r border-white/10 shrink-0">
-      {/* Header */}
-      <div className="p-4 border-b border-white/10">
-        <div className="flex items-center justify-between mb-3">
-          <h1 className="text-lg font-bold text-guara-neon tracking-wide text-glow-neon">Guará-Notes</h1>
-          <div className="flex gap-2 items-center">
-            <button
-              onClick={() => setShowSettings(true)}
-              title="Configurações"
-              className="text-zinc-500 hover:text-zinc-300 transition-colors text-sm"
+    <>
+      <motion.aside
+        initial={false}
+        animate={{ width: isCollapsed ? 64 : 256 }}
+        className="glass flex flex-col h-full border-r border-white/10 shrink-0 relative transition-all overflow-hidden"
+      >
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="absolute -right-3 top-6 z-10 w-6 h-6 rounded-full glass-panel flex items-center justify-center text-text-secondary hover:text-accent-primary"
+        >
+           {isCollapsed ? '▶' : '◀'}
+        </button>
+
+        {/* Header */}
+        <div className="p-4 border-b border-white/10 flex-shrink-0">
+          <div className={`flex items-center justify-between mb-4 ${isCollapsed ? 'flex-col gap-4' : ''}`}>
+            {!isCollapsed ? (
+              <h1 className="text-lg font-bold text-accent-primary tracking-wide text-glow-neon truncate">Guará-Notes</h1>
+            ) : (
+              <span className="text-2xl" title="Guará-Notes">🐺</span>
+            )}
+
+            <div className={`flex gap-2 items-center ${isCollapsed ? 'flex-col' : ''}`}>
+              <button
+                onClick={() => setShowSettings(true)}
+                title="Configurações"
+                className="text-text-muted hover:text-text-primary transition-colors text-sm"
+              >
+                ⚙️
+              </button>
+            </div>
+          </div>
+
+          <div className={`flex gap-1 ${isCollapsed ? 'flex-col items-center' : ''}`}>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleNewNote}
+              className="flex-1 w-full"
+              title="Nova Nota"
             >
-              ⚙️
-            </button>
-            <button
-              id="sidebar-logout"
-              onClick={logout}
-              title="Sair"
-              className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs"
-            >
-              ⎋
-            </button>
+              {isCollapsed ? '+' : '+ Nota'}
+            </Button>
+            {!isCollapsed && (
+              <Button
+                variant="glass"
+                size="sm"
+                onClick={handleNewFolder}
+                className="flex-1 w-full"
+                title="Nova Pasta"
+              >
+                📁 Pasta
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* Ações rápidas */}
-        <div className="flex gap-1">
-          <button
-            id="new-note-btn"
-            onClick={handleNewNote}
-            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 rounded-lg border border-orange-500/20 transition-all"
-          >
-            <span>+</span> Nota
-          </button>
-          <button
-            id="new-folder-btn"
-            onClick={handleNewFolder}
-            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs bg-white/5 hover:bg-white/10 text-zinc-400 rounded-lg border border-white/10 transition-all"
-          >
-            <span>📁</span> Pasta
-          </button>
-        </div>
-      </div>
+        {/* Árvore de Arquivos (Apenas se não colapsado) */}
+        {!isCollapsed && (
+          <>
+            {/* Sort */}
+            <div className="px-3 py-2 border-b border-white/5 flex gap-1 bg-bg-secondary/20">
+              {(['updated_at', 'created_at', 'title'] as SortKey[]).map(k => (
+                <button
+                  key={k}
+                  onClick={() => setSortKey(k)}
+                  className={`text-[10px] px-2 py-1 rounded transition-colors uppercase tracking-wider font-semibold ${sortKey === k ? 'bg-accent-primary/20 text-accent-primary' : 'text-text-muted hover:text-text-secondary'}`}
+                >
+                  {k === 'updated_at' ? 'Edição' : k === 'created_at' ? 'Criação' : 'Nome'}
+                </button>
+              ))}
+            </div>
 
-      {/* Sort */}
-      <div className="px-3 py-2 border-b border-white/5 flex gap-1">
-        {(['updated_at', 'created_at', 'title'] as SortKey[]).map(k => (
-          <button
-            key={k}
-            onClick={() => setSortKey(k)}
-            className={`text-xs px-2 py-1 rounded transition-colors ${sortKey === k ? 'bg-white/10 text-zinc-200' : 'text-zinc-600 hover:text-zinc-400'}`}
-          >
-            {k === 'updated_at' ? 'Edição' : k === 'created_at' ? 'Criação' : 'Nome'}
-          </button>
-        ))}
-      </div>
+            {/* Tree */}
+            <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+              {notesLoading && (
+                <div className="text-text-muted text-xs text-center py-4">Carregando...</div>
+              )}
 
-      {/* Tree */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
-        {notesLoading && (
-          <div className="text-zinc-600 text-xs text-center py-4">Carregando...</div>
-        )}
+              {/* Pastas */}
+              {folders.map(folder => {
+                const folderNotes = sortedNotes.filter(n => n.folder_id === folder.id)
+                const isExpanded = expandedFolders.has(folder.id)
+                return (
+                  <div key={folder.id}>
+                    <button
+                      onClick={() => toggleFolder(folder.id)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={async (e) => {
+                        e.preventDefault()
+                        const noteId = e.dataTransfer.getData('noteId')
+                        if (!noteId) return
+                        try {
+                          const note = notes.find(n => n.id === noteId)
+                          if (note && note.folder_id !== folder.id) {
+                            const res = await notesApi.update(noteId, { folder_id: folder.id })
+                            upsertNote(res.data)
+                          }
+                        } catch (err) {}
+                      }}
+                      className="w-full flex items-center px-2 py-1.5 text-sm text-text-secondary hover:bg-white/5 rounded-lg cursor-pointer transition-colors"
+                    >
+                      <span className="mr-1.5 text-xs opacity-60">{isExpanded ? '▼' : '▶'}</span>
+                      <span className="mr-1.5">📁</span>
+                      <span className="truncate">{folder.name}</span>
+                      <span className="ml-auto text-text-muted text-[10px] bg-white/5 px-1.5 py-0.5 rounded-full">{folderNotes.length}</span>
+                    </button>
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="pl-5 space-y-0.5 mt-0.5 overflow-hidden"
+                        >
+                          {folderNotes.map(note => (
+                            <NoteItem
+                              key={note.id}
+                              note={note}
+                              active={note.id === activeNoteId}
+                              onClick={() => setActiveNoteId(note.id)}
+                              onDelete={(e) => handleDeleteNote(e, note.id)}
+                            />
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )
+              })}
 
-        {/* Pastas */}
-        {folders.map(folder => {
-          const folderNotes = sortedNotes.filter(n => n.folder_id === folder.id)
-          const isExpanded = expandedFolders.has(folder.id)
-          return (
-            <div key={folder.id}>
-              <button
-                onClick={() => toggleFolder(folder.id)}
+              {/* Notas sem pasta */}
+              <div
+                className="mt-4 min-h-[50px]"
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={async (e) => {
                   e.preventDefault()
@@ -154,125 +206,53 @@ export default function Sidebar() {
                   if (!noteId) return
                   try {
                     const note = notes.find(n => n.id === noteId)
-                    if (note && note.folder_id !== folder.id) {
-                      const res = await notesApi.update(noteId, { folder_id: folder.id })
+                    if (note && note.folder_id !== null) {
+                      const res = await notesApi.update(noteId, { folder_id: null })
                       upsertNote(res.data)
                     }
-                  } catch (err) {
-                    console.error('Erro ao mover nota', err)
-                  }
+                  } catch (err) {}
                 }}
-                className="w-full flex items-center px-2 py-1.5 text-sm text-zinc-300 hover:bg-white/5 rounded-lg cursor-pointer transition-colors"
               >
-                <span className="mr-1.5 text-xs text-zinc-500">{isExpanded ? '▼' : '▶'}</span>
-                <span className="mr-1.5">📁</span>
-                <span className="truncate">{folder.name}</span>
-                <span className="ml-auto text-zinc-600 text-xs">{folderNotes.length}</span>
-              </button>
-              {isExpanded && (
-                <div className="pl-5 space-y-0.5 mt-0.5">
-                  {folderNotes.map(note => (
-                    <NoteItem
-                      key={note.id}
-                      note={note}
-                      active={note.id === activeNoteId}
-                      onClick={() => setActiveNoteId(note.id)}
-                      onDelete={(e) => handleDeleteNote(e, note.id)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )
-        })}
-
-        {/* Notas sem pasta */}
-        <div
-          className="mt-2 min-h-[50px]"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={async (e) => {
-            e.preventDefault()
-            const noteId = e.dataTransfer.getData('noteId')
-            if (!noteId) return
-            try {
-              const note = notes.find(n => n.id === noteId)
-              if (note && note.folder_id !== null) {
-                const res = await notesApi.update(noteId, { folder_id: null })
-                upsertNote(res.data)
-              }
-            } catch (err) {
-              console.error('Erro ao remover nota da pasta', err)
-            }
-          }}
-        >
-          <div className="text-xs text-zinc-600 uppercase tracking-wider px-2 py-1">Sem pasta</div>
-          {sortedNotes.filter(n => n.folder_id === null).map(note => (
-            <NoteItem
-              key={note.id}
-              note={note}
-              active={note.id === activeNoteId}
-              onClick={() => setActiveNoteId(note.id)}
-              onDelete={(e) => handleDeleteNote(e, note.id)}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="p-3 border-t border-white/10 text-xs text-zinc-600 text-center flex items-center justify-between">
-        <span>{user?.display_name || user?.username}</span>
-        <span className="text-orange-500/50">AI Powered 🐺</span>
-      </div>
-
-      {/* Modal de Configurações */}
-      {showSettings && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="glass-panel p-6 rounded-lg w-96 max-w-[90vw] shadow-2xl box-glow-neon border border-guara-neon/30">
-            <h2 className="text-lg font-bold text-guara-neon mb-4">Configurações</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs text-zinc-400 mb-1">Provedor de IA (Companion)</label>
-                <select 
-                  value={aiProvider}
-                  onChange={(e) => setAiProvider(e.target.value)}
-                  className="w-full bg-zinc-900 border border-white/10 rounded px-2 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-guara-neon"
-                >
-                  <option value="local">Ollama (Local)</option>
-                  <option value="gemini">Google Gemini</option>
-                  <option value="claude">Anthropic Claude</option>
-                </select>
-                <p className="text-[10px] text-zinc-500 mt-1">
-                  Nota: Chaves de API para serviços externos devem ser configuradas no backend (.env).
-                </p>
+                <div className="text-[10px] text-text-muted uppercase tracking-widest font-bold px-2 py-1 mb-1">Sem pasta</div>
+                {sortedNotes.filter(n => n.folder_id === null).map(note => (
+                  <NoteItem
+                    key={note.id}
+                    note={note}
+                    active={note.id === activeNoteId}
+                    onClick={() => setActiveNoteId(note.id)}
+                    onDelete={(e) => handleDeleteNote(e, note.id)}
+                  />
+                ))}
               </div>
             </div>
+          </>
+        )}
 
-            <div className="flex justify-end gap-2 mt-6">
-              <button 
-                onClick={() => setShowSettings(false)}
-                className="px-4 py-1.5 rounded bg-zinc-800 text-zinc-300 hover:bg-zinc-700 text-sm transition-colors"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={handleSaveSettings}
-                className="px-4 py-1.5 rounded bg-guara-neon/20 border border-guara-neon text-guara-neon hover:bg-guara-neon hover:text-zinc-950 font-medium text-sm transition-colors"
-              >
-                Salvar
-              </button>
-            </div>
-          </div>
+        {/* Footer / Status Bar */}
+        <div className="p-3 border-t border-white/10 bg-bg-secondary/50 text-[10px] text-text-muted flex items-center justify-between flex-shrink-0">
+          {!isCollapsed ? (
+             <>
+               <div className="flex items-center gap-2">
+                 <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e]"></div>
+                 <span className="truncate max-w-[100px]" title={user?.display_name || user?.username}>{user?.display_name || user?.username}</span>
+               </div>
+               <span className="text-accent-primary/60">✓ Sincronizado</span>
+             </>
+          ) : (
+             <div className="mx-auto w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e]"></div>
+          )}
         </div>
-      )}
-    </aside>
+      </motion.aside>
+
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
+    </>
   )
 }
 
 function NoteItem({
   note, active, onClick, onDelete
 }: {
-  note: { id: string; title: string }
+  note: { id: string; title: string; tags?: string[] }
   active: boolean
   onClick: () => void
   onDelete: (e: React.MouseEvent) => void
@@ -286,17 +266,19 @@ function NoteItem({
         e.dataTransfer.effectAllowed = 'move'
       }}
       className={`group flex items-center px-2 py-1.5 text-sm rounded-lg cursor-pointer transition-colors ${
-        active ? 'bg-orange-500/15 text-orange-300 border border-orange-500/20' : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
+        active
+          ? 'bg-accent-primary/15 text-accent-primary border border-accent-primary/20'
+          : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
       }`}
     >
-      <span className="mr-1.5 opacity-50 text-xs">📄</span>
+      <span className="mr-2 text-xs opacity-70">📝</span>
       <span className="truncate flex-1">{note.title || 'Sem título'}</span>
       <button
         onClick={onDelete}
-        className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-all ml-1 px-1"
+        className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-red-400 transition-all ml-1 px-1"
         title="Excluir"
       >
-        ×
+        ✕
       </button>
     </div>
   )

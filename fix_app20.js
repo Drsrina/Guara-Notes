@@ -1,0 +1,5 @@
+const fs = require('fs')
+let code = fs.readFileSync('frontend/src/App.tsx', 'utf-8')
+code = code.replace(/import ReactGridLayout from 'react-grid-layout'/g, "import { Responsive as ResponsiveGridLayout, WidthProvider } from 'react-grid-layout'")
+code = code.replace(/const WidthProvider = \(ReactGridLayout as any\)\.WidthProvider\nconst ResponsiveGridLayout = \(ReactGridLayout as any\)\.Responsive\n/g, "")
+fs.writeFileSync('frontend/src/App.tsx', code)
