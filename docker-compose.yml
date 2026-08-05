@@ -61,9 +61,13 @@ services:
       - SEMANTIC_THRESHOLD=${SEMANTIC_THRESHOLD:-0.35}
       - SEMANTIC_TOP_K=${SEMANTIC_TOP_K:-8}
     depends_on:
-      - redis
-      - postgres
-      - ollama
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+        required: false   # não bloqueia se AI_PROVIDER != local
     restart: unless-stopped
 
   postgres:

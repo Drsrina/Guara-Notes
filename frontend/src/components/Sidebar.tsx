@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useAuthStore, useAppStore } from '../store'
+import { useAuthStore, useAppStore, useWorkspaceStore } from '../store'
 import { notesApi } from '../api/notes'
 import { foldersApi } from '../api/folders'
 import { SettingsModal } from './SettingsModal'
@@ -11,10 +11,10 @@ type SortKey = 'updated_at' | 'created_at' | 'title'
 export default function Sidebar() {
   const { user } = useAuthStore()
   const { notes, folders, activeNoteId, setActiveNoteId, upsertNote, removeNote, upsertFolder, notesLoading } = useAppStore()
+  const { sidebarCollapsed: isCollapsed, setSidebarCollapsed: setIsCollapsed } = useWorkspaceStore()
   const [showSettings, setShowSettings] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>('updated_at')
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
-  const [isCollapsed, setIsCollapsed] = useState(false)
 
   const sortedNotes = useMemo(() => {
     return [...notes].sort((a, b) => {

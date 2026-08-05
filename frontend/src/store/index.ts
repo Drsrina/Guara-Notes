@@ -153,7 +153,6 @@ export const useTagsStore = create<TagsState>()(
       getTagColor: (name) => {
         const tag = get().tags.find(t => t.name === name)
         if (tag) return tag.color
-        // Assign deterministic default color
         let hash = 0
         for (let i = 0; i < name.length; i++) {
           hash = name.charCodeAt(i) + ((hash << 5) - hash)
@@ -165,20 +164,76 @@ export const useTagsStore = create<TagsState>()(
   )
 )
 
+// ─── Workspace Store ──────────────────────────────────────────────────────────
+
+export type TabType = 'editor' | 'graph2d' | 'brain3d' | 'chat'
+export type SplitDirection = 'vertical' | 'horizontal'
+
+export interface PaneState {
+  id: string
+  activeTab: TabType
+}
+
+interface WorkspaceState {
+  panes: PaneState[]
+  splitDir: SplitDirection
+  splitRatio: number // 0.0–1.0
+  sidebarCollapsed: boolean
+  addPane: () => void
+  removePane: (id: string) => void
+  setActiveTab: (paneId: string, tab: TabType) => void
+  setSplitDir: (dir: SplitDirection) => void
+  setSplitRatio: (ratio: number) => void
+  setSidebarCollapsed: (v: boolean) => void
+  toggleSidebar: () => void
+}
+
+const defaultPanes: PaneState[] = [{ id: 'pane-1', activeTab: 'editor' }]
+
+export const useWorkspaceStore = create<WorkspaceState>()(
+  persist(
+    (set, get) => ({
+      panes: defaultPanes,
+      splitDir: 'vertical',
+      splitRatio: 0.5,
+      sidebarCollapsed: false,
+
+      addPane: () => {
+        const { panes } = get()
+        if (panes.length >= 2) return
+        set({ panes: [...panes, { id: `pane-${Date.now()}`, activeTab: 'editor' }] })
+      },
+
+      removePane: (id) => {
+        const { panes } = get()
+        if (panes.length <= 1) return
+        set({ panes: panes.filter(p => p.id !== id) })
+      },
+
+      setActiveTab: (paneId, tab) =>
+        set((state) => ({
+          panes: state.panes.map(p => p.id === paneId ? { ...p, activeTab: tab } : p)
+        })),
+
+      setSplitDir: (dir) => set({ splitDir: dir }),
+      setSplitRatio: (ratio) => set({ splitRatio: Math.min(0.8, Math.max(0.2, ratio)) }),
+      setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
+      toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+    }),
+    { name: 'guara-workspace' }
+  )
+)
+
 // ─── App Store ────────────────────────────────────────────────────────────────
 
 interface AppState {
-  // Dados
   notes: Note[]
   folders: Folder[]
   activeNoteId: string | null
   focusMode: boolean
-
-  // Loading states
   notesLoading: boolean
   foldersLoading: boolean
 
-  // Setters
   setNotes: (notes: Note[]) => void
   setFolders: (folders: Folder[]) => void
   setActiveNoteId: (id: string | null) => void
@@ -187,7 +242,6 @@ interface AppState {
   setFocusMode: (v: boolean) => void
   toggleFocusMode: () => void
 
-  // Mutações locais (otimistic updates)
   upsertNote: (note: Note) => void
   removeNote: (id: string) => void
   upsertFolder: (folder: Folder) => void

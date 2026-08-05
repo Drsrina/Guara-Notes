@@ -3,7 +3,11 @@
 > **Ferramenta de escrita com IA e vetores para escritores e pesquisadores.**
 > Self-hosted, privado, poderoso. Roda com Ollama local (CPU/GPU) ou APIs externas.
 
-O diferencial do Guará-Notes não está na "ideia conceitual", mas em como ela foi implementada como um produto de engenharia:Cérebro Semântico 3D via UMAP: Reduzir vetores de alta dimensão (1536 posições do nomic-embed-text) para coordenadas X, Y, Z visíveis em um ambiente interativo 3D com Three.js é algo raríssimo de ver pronto e funcional em projetos open-source simples.Pipeline de Engenharia Robusto: Integrar FastAPI + Celery + Redis + pgvector em um pacote Docker com bootstrap automático para rodar LLMs pesados localmente (via Ollama) é uma arquitetura de nível empresarial entregue de forma acessível.Privacidade Absoluta para Escritores: Misturar a experiência fluida de escrita com o poder de IA generativa sem que uma única linha de texto saia do computador do usuário resolve a maior dor de autores e pesquisadores que temem o plágio ou o treino de modelos comerciais com suas obras.
+O diferencial do Guará-Notes não está na "ideia conceitual", mas em como ela foi implementada como um produto de engenharia:
+
+- **Cérebro Semântico 3D via UMAP** — Reduzir vetores de alta dimensão (1536 posições do `nomic-embed-text`) para coordenadas X, Y, Z visíveis em um ambiente interativo 3D com Three.js é algo raríssimo de ver pronto e funcional em projetos open-source simples.
+- **Pipeline de Engenharia Robusto** — Integrar FastAPI + Celery + Redis + pgvector em um pacote Docker com bootstrap automático para rodar LLMs pesados localmente (via Ollama) é uma arquitetura de nível empresarial entregue de forma acessível.
+- **Privacidade Absoluta para Escritores** — Misturar a experiência fluida de escrita com o poder de IA generativa sem que uma única linha de texto saia do computador do usuário resolve a maior dor de autores e pesquisadores que temem o plágio ou o treino de modelos comerciais com suas obras.
 
 ---
 
@@ -29,22 +33,22 @@ O diferencial do Guará-Notes não está na "ideia conceitual", mas em como ela 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    Navegador (:5757)                    │
-│  React + Zustand + MDEditor + Three.js + ForceGraph     │
+│  React + Zustand + MDEditor + Three.js + ForceGraph      │
 └──────────────────────┬──────────────────────────────────┘
-                       │ /api → Nginx proxy reverso
-┌──────────────────────▼──────────────────────────────────┐
-│              Backend FastAPI (:8000)                    │
-│  Auth JWT  │  Notes CRUD  │  Graph  │  AI (RAG)        │
-└──────┬──────────────┬───────────────────────────────────┘
-       │              │
-┌──────▼──────┐ ┌─────▼──────────────────────────────────┐
-│  Postgres   │ │  Celery Worker                         │
-│  + pgvector │ │  Embeddings → pgvector                 │
-│  (vetores)  │ │  Links Semânticos → cosine distance    │
-└─────────────┘ │  UMAP 3D coords                        │
-                └─────────────┬──────────────────────────┘
-┌───────────────┐             │
-│  Redis        │◄────────────┘ (broker/result backend)
+                        │ /api → Nginx proxy reverso
+┌───────────────────────▼─────────────────────────────────┐
+│              Backend FastAPI (:8000)                     │
+│  Auth JWT  │  Notes CRUD  │  Graph  │  AI (RAG)          │
+└──────┬───────────────┬───────────────────────────────────┘
+       │               │
+┌──────▼──────┐  ┌─────▼─────────────────────────────────┐
+│  Postgres   │  │  Celery Worker                         │
+│  + pgvector │  │  Embeddings → pgvector                 │
+│  (vetores)  │  │  Links Semânticos → cosine distance     │
+└─────────────┘  │  UMAP 3D coords                        │
+                  └─────────────┬───────────────────────────┘
+┌───────────────┐               │
+│  Redis        │◄──────────────┘ (broker/result backend)
 │  (AOF, :6379) │
 └───────────────┘
 ┌───────────────┐
@@ -213,32 +217,32 @@ Ao salvar uma nota com `[[Título de Outra Nota]]`, o sistema automaticamente cr
 guara-notes/
 ├── backend/
 │   ├── main.py          # FastAPI app + lifespan + CORS
-│   ├── models.py        # SQLAlchemy models (Note, Folder, NoteLink, AI*)
-│   ├── schemas.py       # Pydantic schemas
-│   ├── database.py      # Conexão async PostgreSQL
-│   ├── auth.py          # JWT + bcrypt
-│   ├── worker.py        # Celery app config
-│   ├── tasks.py         # Embeddings + links semânticos + UMAP
+│   ├── models.py         # SQLAlchemy models (Note, Folder, NoteLink, AI*)
+│   ├── schemas.py         # Pydantic schemas
+│   ├── database.py        # Conexão async PostgreSQL
+│   ├── auth.py             # JWT + bcrypt
+│   ├── worker.py           # Celery app config
+│   ├── tasks.py            # Embeddings + links semânticos + UMAP
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── routers/
-│       ├── auth.py      # Login, register, /me
-│       ├── notes.py     # CRUD + wikilinks + enqueue embedding
-│       ├── folders.py   # CRUD de pastas
-│       ├── graph.py     # Grafo 2D + Brain 3D (UMAP coords)
-│       └── ai.py        # Chat RAG + Ghost Writer + sessões
+│       ├── auth.py         # Login, register, /me
+│       ├── notes.py        # CRUD + wikilinks + enqueue embedding
+│       ├── folders.py      # CRUD de pastas
+│       ├── graph.py        # Grafo 2D + Brain 3D (UMAP coords)
+│       └── ai.py           # Chat RAG + Ghost Writer + sessões
 ├── frontend/
 │   ├── src/
-│   │   ├── api/         # Clients axios tipados
-│   │   ├── components/  # Editor, Sidebar, AIChat, Graph2D, Brain3D
-│   │   ├── pages/       # LoginPage
-│   │   └── store/       # Zustand (auth + app state)
-│   ├── nginx.conf       # SPA + proxy reverso
-│   ├── vite.config.ts   # Dev server :5757 + proxy /api
-│   └── Dockerfile       # Multi-stage (Node build + Nginx serve)
-├── docker-compose.yml   # Stack completa (CPU + GPU opcional)
-├── bootstrap.sh         # Setup automático com pull de modelos
-├── .env.example         # Template documentado
+│   │   ├── api/             # Clients axios tipados
+│   │   ├── components/      # Editor, Sidebar, AIChat, Graph2D, Brain3D
+│   │   ├── pages/            # LoginPage
+│   │   └── store/            # Zustand (auth + app state)
+│   ├── nginx.conf            # SPA + proxy reverso
+│   ├── vite.config.ts        # Dev server :5757 + proxy /api
+│   └── Dockerfile            # Multi-stage (Node build + Nginx serve)
+├── docker-compose.yml         # Stack completa (CPU + GPU opcional)
+├── bootstrap.sh                # Setup automático com pull de modelos
+├── .env.example                 # Template documentado
 └── README.md
 ```
 
