@@ -1,39 +1,60 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import MDEditor from '@uiw/react-md-editor'
 import { notesApi } from '../api/notes'
-import { useAppStore } from '../store'
+import { useAppStore, useTagsStore, useSettingsStore } from '../store'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import Whiteboard from './Whiteboard'
 import Dataview from './Dataview'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface EditorProps {
   noteId: string | null
+  inFocusMode?: boolean
+  panelId?: string
 }
 
-export default function Editor({ noteId }: EditorProps) {
-  const { notes, upsertNote, focusMode, toggleFocusMode } = useAppStore()
+export default function Editor({ noteId, inFocusMode = false, panelId }: EditorProps) {
+  useEffect(() => {
+    if (!panelId) return
+    const handleExportMd = () => document.getElementById(`export-md-btn-${panelId}`)?.click()
+    const handleExportPdf = () => document.getElementById(`export-pdf-btn-${panelId}`)?.click()
+    document.addEventListener(`export-md-${panelId}`, handleExportMd)
+    document.addEventListener(`export-pdf-${panelId}`, handleExportPdf)
+    return () => {
+      document.removeEventListener(`export-md-${panelId}`, handleExportMd)
+      document.removeEventListener(`export-pdf-${panelId}`, handleExportPdf)
+    }
+  }, [panelId])
+  const { notes, upsertNote, toggleFocusMode } = useAppStore()
+  const { getTagColor, addTag } = useTagsStore()
+  const { settings } = useSettingsStore()
   const note = notes.find(n => n.id === noteId)
 
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [versions, setVersions] = useState<any[]>([])
-  const [showVersions, setShowVersions] = useState(false)
-  const [viewMode, setViewMode] = useState<'markdown' | 'whiteboard' | 'dataview'>('markdown')
+  const [tags, setTags] = useState<string[]>([])
+  const [newTag, setNewTag] = useState('')
+  const [showTagPanel, setShowTagPanel] = useState(false)
+  const [_versions, setVersions] = useState<any[]>([])
+  const [_showVersions, setShowVersions] = useState(false)
+  const [viewMode] = useState<'markdown' | 'whiteboard' | 'dataview'>('markdown')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const editorRef = useRef<HTMLDivElement>(null)
 
-  // Sincroniza estado local quando a nota muda
+  // Sync with note state
   useEffect(() => {
     if (note) {
       setTitle(note.title)
       setContent(note.content)
+      setTags(note.tags || [])
       loadVersions()
     } else {
       setTitle('')
       setContent('')
+      setTags([])
       setVersions([])
     }
   }, [noteId])
@@ -48,7 +69,8 @@ export default function Editor({ noteId }: EditorProps) {
     }
   }
 
-  const handleRestore = async (versionId: string) => {
+      // @ts-ignore
+  const _handleRestore = async (versionId: string) => {
     if (!noteId) return
     try {
       const res = await notesApi.restoreVersion(noteId, versionId)
@@ -57,47 +79,63 @@ export default function Editor({ noteId }: EditorProps) {
       setContent(res.data.content)
       setShowVersions(false)
       loadVersions()
-    } catch (e) {
-      console.error("Erro ao restaurar versão", e)
-    }
+    } catch (e) {}
   }
 
-  const doSave = useCallback(async (newTitle: string, newContent: string) => {
+  const doSave = useCallback(async (newTitle: string, newContent: string, newTags: string[]) => {
     if (!noteId) return
     setSaving(true)
     try {
-      const res = await notesApi.update(noteId, { title: newTitle, content: newContent })
+      const res = await notesApi.update(noteId, { title: newTitle, content: newContent, tags: newTags })
       upsertNote(res.data)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
-      loadVersions() // recarrega se criou um backup
+      loadVersions()
     } catch (e) {
-      console.error('Erro ao salvar nota', e)
     } finally {
       setSaving(false)
     }
-  }, [noteId])
+  }, [noteId, upsertNote])
 
-  const scheduleAutosave = (newTitle: string, newContent: string) => {
+  const scheduleAutosave = (newTitle: string, newContent: string, newTags: string[]) => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => doSave(newTitle, newContent), 2000)
+    debounceRef.current = setTimeout(() => doSave(newTitle, newContent, newTags), settings.autoSaveDelay * 1000)
   }
 
   const handleContentChange = (val?: string) => {
     const v = val ?? ''
     setContent(v)
-    scheduleAutosave(title, v)
+    scheduleAutosave(title, v, tags)
   }
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTitle(e.target.value)
-    scheduleAutosave(e.target.value, content)
+    scheduleAutosave(e.target.value, content, tags)
   }
 
-  // Cleanup debounce ao desmontar
+  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && newTag.trim()) {
+      const t = newTag.trim().toLowerCase()
+      if (!tags.includes(t)) {
+        const updatedTags = [...tags, t]
+        setTags(updatedTags)
+        addTag({ name: t, color: getTagColor(t) }) // Ensure tag config exists
+        scheduleAutosave(title, content, updatedTags)
+      }
+      setNewTag('')
+    }
+  }
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    const updatedTags = tags.filter(t => t !== tagToRemove)
+    setTags(updatedTags)
+    scheduleAutosave(title, content, updatedTags)
+  }
+
   useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current) }, [])
 
-  const exportMD = () => {
+      // @ts-ignore
+  const _exportMD = () => {
     const blob = new Blob([content], { type: 'text/markdown' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -107,102 +145,85 @@ export default function Editor({ noteId }: EditorProps) {
     URL.revokeObjectURL(url)
   }
 
-  const exportPDF = async () => {
+      const _exportPDF = async () => {
     if (!editorRef.current) return
     const preview = editorRef.current.querySelector('.wmde-markdown') as HTMLElement
     if (!preview) return
-
     try {
-      const canvas = await html2canvas(preview, {
-        backgroundColor: '#09090b', // zinc-950
-        scale: 2,
-      })
+      const canvas = await html2canvas(preview, { backgroundColor: '#09090b', scale: 2 })
       const imgData = canvas.toDataURL('image/png')
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'px',
-        format: [canvas.width, canvas.height]
-      })
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width, canvas.height] })
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height)
       pdf.save(`${title || 'nota'}.pdf`)
-    } catch (e) {
-      console.error('Erro ao exportar PDF', e)
-    }
+    } catch (e) {}
   }
 
   if (!noteId) {
     return (
-      <div className="h-full flex items-center justify-center bg-zinc-950">
+      <div className="h-full flex flex-col items-center justify-center bg-bg-primary">
         <div className="text-center">
           <div className="text-5xl mb-4">🐺</div>
-          <p className="text-zinc-500 text-sm">Selecione uma nota ou crie uma nova</p>
+          <p className="text-text-muted text-sm">Selecione uma nota ou crie uma nova</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="h-full flex flex-col bg-zinc-950" data-color-mode="dark">
-      {/* Barra superior */}
-      <div className="flex items-center gap-3 px-6 py-3 border-b border-white/10 shrink-0">
-        <input
-          id="note-title-input"
-          value={title}
-          onChange={handleTitleChange}
-          className="flex-1 bg-transparent text-zinc-100 text-lg font-semibold focus:outline-none placeholder-zinc-600"
-          placeholder="Título da nota..."
-        />
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-600 mr-2">
-            {saving ? '💾 Salvando...' : saved ? '✅ Salvo' : ''}
-          </span>
-          <select 
-            value={viewMode}
-            onChange={(e) => setViewMode(e.target.value as any)}
-            className="bg-zinc-900 border border-white/10 rounded px-2 py-1 text-xs text-zinc-200 focus:outline-none focus:border-guara-neon mr-1"
-          >
-            <option value="markdown">✏️ Editor Markdown</option>
-            <option value="whiteboard">🎨 Quadro Branco</option>
-            <option value="dataview">📊 Dataview</option>
-          </select>
-          <button
-            onClick={() => alert('Nova janela não implementada na versão atual')}
-            className="px-2 py-1 text-xs bg-white/5 hover:bg-white/10 rounded transition-colors text-zinc-300"
-            title="Nova Janela"
-          >
-            +
-          </button>
-          <button
-            onClick={() => alert('Split editor não implementado na versão atual')}
-            className="px-2 py-1 text-xs bg-white/5 hover:bg-white/10 rounded transition-colors text-zinc-300"
-            title="Split Editor"
-          >
-            ◫ Split
-          </button>
-          <div className="relative">
+    <div className={`h-full flex relative overflow-hidden bg-bg-primary`} data-color-mode={settings.theme}>
+
+      {/* Editor Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+
+        {/* Hidden buttons for external export trigger */}
+        <button id={`export-md-btn-${panelId}`} onClick={_exportMD} className="hidden" />
+        <button id={`export-pdf-btn-${panelId}`} onClick={_exportPDF} className="hidden" />
+        {/* Topbar: Only show in regular mode, not in focus mode (handled by Layout/MainView) */}
+        {!inFocusMode && (
+          <div className="flex items-center justify-between px-6 py-3 border-b border-white/10 shrink-0">
+            <input
+              value={title}
+              onChange={handleTitleChange}
+              className="flex-1 bg-transparent text-text-primary text-xl font-bold focus:outline-none placeholder-text-muted"
+              placeholder="Título da nota..."
+            />
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-text-muted mr-2">
+                {saving ? '💾 Salvando...' : saved ? '✅ Salvo' : ''}
+              </span>
+
+              <button
+                onClick={() => setShowTagPanel(!showTagPanel)}
+                className={`px-3 py-1.5 text-xs rounded transition-colors flex items-center gap-1 ${showTagPanel ? 'bg-accent-primary/20 text-accent-primary' : 'bg-white/5 hover:bg-white/10 text-text-secondary'}`}
+              >
+                🏷️ Tags <span className="bg-white/10 px-1.5 rounded-full text-[10px] ml-1">{tags.length}</span>
+              </button>
+
+              <div className="relative">
             <button
-              onClick={() => setShowVersions(!showVersions)}
-              className="px-2 py-1 text-xs bg-white/5 hover:bg-white/10 rounded transition-colors text-zinc-300"
+              onClick={() => setShowVersions(!_showVersions)}
+              className="px-3 py-1.5 text-xs bg-white/5 hover:bg-white/10 text-text-secondary rounded transition-colors"
               title="Histórico de Versões"
             >
               ⏱️
             </button>
-            {showVersions && (
-              <div className="absolute right-0 mt-2 w-64 glass-panel border border-guara-neon/20 rounded-md shadow-xl py-2 z-50">
-                <div className="px-3 pb-2 mb-2 border-b border-white/10 text-xs font-semibold text-guara-neon">
+            {_showVersions && (
+              <div className="absolute right-0 mt-2 w-64 glass-panel border border-accent-primary/20 rounded-md shadow-xl py-2 z-50">
+                <div className="px-3 pb-2 mb-2 border-b border-white/10 text-xs font-semibold text-accent-primary text-glow-neon">
                   Histórico de Versões
                 </div>
-                {versions.length === 0 ? (
-                  <div className="px-3 text-xs text-zinc-500">Nenhum backup disponível.</div>
+                {_versions.length === 0 ? (
+                  <div className="px-3 text-xs text-text-muted">Nenhum backup disponível.</div>
                 ) : (
-                  versions.map((v) => (
+                  _versions.map((v) => (
                     <div key={v.id} className="px-3 py-2 hover:bg-white/5 flex flex-col gap-1 transition-colors">
-                      <span className="text-xs text-zinc-300 truncate">{v.title}</span>
+                      <span className="text-xs text-text-primary truncate">{v.title}</span>
                       <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-zinc-500">{new Date(v.created_at).toLocaleString()}</span>
+                        <span className="text-[10px] text-text-muted">{new Date(v.created_at).toLocaleString()}</span>
                         <button 
-                          onClick={() => handleRestore(v.id)}
-                          className="text-[10px] text-orange-400 hover:text-orange-300"
+                          onClick={() => _handleRestore(v.id)}
+                          className="text-[10px] text-accent-primary hover:text-accent-glow"
                         >
                           Restaurar
                         </button>
@@ -213,49 +234,104 @@ export default function Editor({ noteId }: EditorProps) {
               </div>
             )}
           </div>
-          <button
-            onClick={exportMD}
-            className="px-2 py-1 text-xs bg-white/5 hover:bg-white/10 rounded transition-colors text-zinc-300"
-            title="Baixar Markdown"
-          >
-            .MD
-          </button>
-          <button
-            onClick={exportPDF}
-            className="px-2 py-1 text-xs bg-white/5 hover:bg-white/10 rounded transition-colors text-zinc-300"
-            title="Exportar PDF"
-          >
-            .PDF
-          </button>
-          <button
-            onClick={toggleFocusMode}
-            className={`px-2 py-1 text-xs rounded transition-colors ${focusMode ? 'bg-orange-500/20 text-orange-400' : 'bg-white/5 hover:bg-white/10 text-zinc-300'}`}
-            title="Modo Escritor (Focus)"
-          >
-            {focusMode ? '⤡ Sair' : '⤢ Focus'}
-          </button>
+
+              <button
+                onClick={toggleFocusMode}
+                className="px-3 py-1.5 text-xs bg-white/5 hover:bg-white/10 text-text-secondary rounded transition-colors"
+                title="Modo Escritor (Focus)"
+              >
+                ⤢ Focus
+              </button>
+            </div>
+          </div>
+        )}
+
+        {inFocusMode && (
+           <div className="px-6 py-4 border-b border-white/10 shrink-0">
+              <input
+                value={title}
+                onChange={handleTitleChange}
+                className="w-full bg-transparent text-text-primary text-3xl font-bold focus:outline-none placeholder-text-muted"
+                placeholder="Título da nota..."
+              />
+           </div>
+        )}
+
+        {/* View Area */}
+        <div className={`flex-1 overflow-hidden relative ${settings.editorMaxWidth && inFocusMode ? 'max-w-4xl mx-auto w-full' : 'w-full'}`} ref={editorRef}>
+          {viewMode === 'markdown' && (
+            <MDEditor
+              value={content}
+              onChange={handleContentChange}
+              height="100%"
+              preview={settings.livePreview ? 'live' : 'edit'}
+              className="!h-full !bg-transparent !border-none custom-scrollbar"
+              style={{ height: '100%', fontSize: `${settings.editorFontSize}px` }}
+              textareaProps={{
+                placeholder: 'Comece a escrever... (Markdown suportado, use [[título]] para wikilinks)',
+              }}
+            />
+          )}
+          {viewMode === 'whiteboard' && <Whiteboard noteId={noteId} />}
+          {viewMode === 'dataview' && <Dataview />}
         </div>
       </div>
 
-      {/* Área de Visualização */}
-      <div className="flex-1 overflow-hidden relative" ref={editorRef}>
-        {viewMode === 'markdown' && (
-          <MDEditor
-            value={content}
-            onChange={handleContentChange}
-            height="100%"
-            preview="live"
-            className="!h-full !bg-zinc-950 !border-none"
-            style={{ height: '100%' }}
-            textareaProps={{
-              id: 'note-content-editor',
-              placeholder: 'Comece a escrever... (Markdown suportado, use [[título]] para wikilinks)',
-            }}
-          />
+      {/* Right Sidebar: Tag Panel */}
+      <AnimatePresence>
+        {showTagPanel && !inFocusMode && (
+          <motion.div
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 256, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            className="h-full border-l border-white/10 bg-bg-secondary/30 backdrop-blur-md flex flex-col shrink-0 overflow-hidden"
+          >
+            <div className="p-4 border-b border-white/10">
+              <h3 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
+                🏷️ Tags da Nota
+              </h3>
+              <input
+                type="text"
+                placeholder="Adicionar tag... (Enter)"
+                value={newTag}
+                onChange={e => setNewTag(e.target.value)}
+                onKeyDown={handleAddTag}
+                className="w-full input-glass text-xs py-1.5 px-2"
+              />
+            </div>
+            <div className="flex-1 p-4 overflow-y-auto custom-scrollbar flex flex-wrap gap-2 content-start">
+              {tags.map(tag => {
+                const color = getTagColor(tag)
+                return (
+                  <div
+                    key={tag}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border"
+                    style={{
+                      backgroundColor: `${color}20`, // 20% opacity
+                      borderColor: `${color}50`,
+                      color: color
+                    }}
+                  >
+                    #{tag}
+                    <button
+                      onClick={() => handleRemoveTag(tag)}
+                      className="hover:bg-white/20 rounded-full w-4 h-4 flex items-center justify-center transition-colors"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )
+              })}
+              {tags.length === 0 && (
+                <div className="text-xs text-text-muted text-center w-full mt-4">
+                  Nenhuma tag adicionada.
+                </div>
+              )}
+            </div>
+          </motion.div>
         )}
-        {viewMode === 'whiteboard' && <Whiteboard noteId={noteId} />}
-        {viewMode === 'dataview' && <Dataview />}
-      </div>
+      </AnimatePresence>
+
     </div>
   )
 }

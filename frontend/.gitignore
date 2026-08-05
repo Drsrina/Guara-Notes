@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 
 MASTERPROMPT.MD
+node_modules
