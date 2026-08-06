@@ -195,12 +195,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     <Modal isOpen={isOpen} onClose={onClose} title="Configurações" className="w-[800px] max-w-[95vw] h-[600px] max-h-[90vh]">
       <div className="flex h-full -mx-6 -my-6">
         {/* Sidebar Tabs */}
-        <div className="w-48 border-r border-white/10 bg-bg-secondary/30 p-2 flex flex-col gap-1 overflow-y-auto custom-scrollbar">
+        <div className="w-56 border-r border-white/10 bg-bg-secondary/30 p-4 flex flex-col gap-1 overflow-y-auto custom-scrollbar">
           {visibleTabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center gap-2 ${
+              className={`text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-3 ${
                 activeTab === tab.id
                   ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/30'
                   : 'text-text-secondary hover:bg-white/5 hover:text-text-primary'
@@ -213,31 +213,31 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 p-8 overflow-y-auto custom-scrollbar">
 
           {/* APARÊNCIA */}
           {activeTab === 'appearance' && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-medium text-text-primary border-b border-white/10 pb-2 mb-4">Aparência</h3>
+            <div className="space-y-8">
+              <h3 className="text-2xl font-bold text-text-primary border-b border-white/10 pb-4 mb-6">Aparência</h3>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
-                  <label className="block text-sm text-text-secondary mb-1">Tema</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Tema</label>
                   <select
                     value={settings.theme}
                     onChange={e => updateSettings({ theme: e.target.value as any })}
-                    className="w-full bg-bg-tertiary border border-white/10 rounded p-2 text-sm focus:border-accent-primary"
+                    className="w-full bg-bg-tertiary border border-white/10 rounded-md p-2.5 text-sm text-text-primary focus:border-accent-primary focus:ring-1 focus:ring-accent-primary transition-all shadow-inner"
                   >
                     <option value="dark">Dark</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm text-text-secondary mb-1">Densidade de UI</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Densidade de UI</label>
                   <select
                     value={settings.uiDensity}
                     onChange={e => updateSettings({ uiDensity: e.target.value as any })}
-                    className="w-full bg-bg-tertiary border border-white/10 rounded p-2 text-sm focus:border-accent-primary"
+                    className="w-full bg-bg-tertiary border border-white/10 rounded-md p-2.5 text-sm text-text-primary focus:border-accent-primary focus:ring-1 focus:ring-accent-primary transition-all shadow-inner"
                   >
                     <option value="compact">Compacto</option>
                     <option value="normal">Normal</option>
@@ -246,11 +246,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-text-secondary mb-1">Animações</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Animações</label>
                   <select
                     value={settings.animations}
                     onChange={e => updateSettings({ animations: e.target.value as any })}
-                    className="w-full bg-bg-tertiary border border-white/10 rounded p-2 text-sm focus:border-accent-primary"
+                    className="w-full bg-bg-tertiary border border-white/10 rounded-md p-2.5 text-sm text-text-primary focus:border-accent-primary focus:ring-1 focus:ring-accent-primary transition-all shadow-inner"
                   >
                     <option value="smooth">Suave</option>
                     <option value="fast">Rápido</option>
@@ -259,7 +259,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-text-secondary mb-1">Blur do Glassmorphism (px)</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Blur do Glassmorphism (px)</label>
                   <input
                     type="range" min="5" max="30"
                     value={settings.glassBlur}
@@ -274,12 +274,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           {/* EDITOR */}
           {activeTab === 'editor' && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-medium text-text-primary border-b border-white/10 pb-2 mb-4">Editor</h3>
+            <div className="space-y-8">
+              <h3 className="text-2xl font-bold text-text-primary border-b border-white/10 pb-4 mb-6">Editor</h3>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
-                  <label className="block text-sm text-text-secondary mb-1">Tamanho da Fonte (px)</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Tamanho da Fonte (px)</label>
                   <input
                     type="range" min="12" max="24"
                     value={settings.editorFontSize}
@@ -290,7 +290,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-text-secondary mb-1">Auto-save delay (s)</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Auto-save delay (s)</label>
                   <input
                     type="range" min="1" max="10" step="0.5"
                     value={settings.autoSaveDelay}
@@ -327,16 +327,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           {/* GRAFO */}
           {activeTab === 'graph' && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-medium text-text-primary border-b border-white/10 pb-2 mb-4">Grafo & Cérebro 3D</h3>
+            <div className="space-y-8">
+              <h3 className="text-2xl font-bold text-text-primary border-b border-white/10 pb-4 mb-6">Grafo & Cérebro 3D</h3>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
-                  <label className="block text-sm text-text-secondary mb-1">Modo de Cor</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Modo de Cor</label>
                   <select
                     value={settings.colorMode}
                     onChange={e => updateSettings({ colorMode: e.target.value as any })}
-                    className="w-full bg-bg-tertiary border border-white/10 rounded p-2 text-sm focus:border-accent-primary"
+                    className="w-full bg-bg-tertiary border border-white/10 rounded-md p-2.5 text-sm text-text-primary focus:border-accent-primary focus:ring-1 focus:ring-accent-primary transition-all shadow-inner"
                   >
                     <option value="tag">Por Tag</option>
                     <option value="folder">Por Pasta</option>
@@ -344,11 +344,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-text-secondary mb-1">Tamanho dos Nós</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Tamanho dos Nós</label>
                   <select
                     value={settings.nodeSize}
                     onChange={e => updateSettings({ nodeSize: e.target.value as any })}
-                    className="w-full bg-bg-tertiary border border-white/10 rounded p-2 text-sm focus:border-accent-primary"
+                    className="w-full bg-bg-tertiary border border-white/10 rounded-md p-2.5 text-sm text-text-primary focus:border-accent-primary focus:ring-1 focus:ring-accent-primary transition-all shadow-inner"
                   >
                     <option value="small">Pequeno</option>
                     <option value="medium">Médio</option>
@@ -357,7 +357,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-text-secondary mb-1">Força de Atração</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Força de Atração</label>
                   <input
                     type="range" min="0.1" max="2" step="0.1"
                     value={settings.graphAttraction}
@@ -393,16 +393,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           {/* IA COMPANION */}
           {activeTab === 'ai' && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-medium text-text-primary border-b border-white/10 pb-2 mb-4">IA Companion</h3>
+            <div className="space-y-8">
+              <h3 className="text-2xl font-bold text-text-primary border-b border-white/10 pb-4 mb-6">IA Companion</h3>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
-                  <label className="block text-sm text-text-secondary mb-1">Provedor</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Provedor</label>
                   <select
                     value={settings.aiProvider}
                     onChange={e => updateSettings({ aiProvider: e.target.value as any })}
-                    className="w-full bg-bg-tertiary border border-white/10 rounded p-2 text-sm focus:border-accent-primary"
+                    className="w-full bg-bg-tertiary border border-white/10 rounded-md p-2.5 text-sm text-text-primary focus:border-accent-primary focus:ring-1 focus:ring-accent-primary transition-all shadow-inner"
                   >
                     <option value="local">Ollama (Local)</option>
                     <option value="gemini">Google Gemini</option>
@@ -412,7 +412,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
                 {settings.aiProvider === 'local' && (
                   <div>
-                    <label className="block text-sm text-text-secondary mb-1">Modelo</label>
+                    <label className="block text-sm font-medium text-text-secondary mb-2">Modelo</label>
                     <input
                       type="text"
                       value={settings.aiModel}
@@ -424,7 +424,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 )}
 
                 <div>
-                  <label className="block text-sm text-text-secondary mb-1">Temperatura: {settings.aiTemperature}</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Temperatura: {settings.aiTemperature}</label>
                   <input
                     type="range" min="0" max="1" step="0.1"
                     value={settings.aiTemperature}
@@ -434,7 +434,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-text-secondary mb-1">Contexto RAG (Top K): {settings.aiRagTopK}</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Contexto RAG (Top K): {settings.aiRagTopK}</label>
                   <input
                     type="range" min="1" max="15" step="1"
                     value={settings.aiRagTopK}
@@ -448,8 +448,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           {/* DADOS */}
           {activeTab === 'data' && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-medium text-text-primary border-b border-white/10 pb-2 mb-4">Dados & Sincronização</h3>
+            <div className="space-y-8">
+              <h3 className="text-2xl font-bold text-text-primary border-b border-white/10 pb-4 mb-6">Dados & Sincronização</h3>
 
               <div className="bg-bg-tertiary/50 p-4 rounded-lg border border-white/5 space-y-2 text-sm">
                 <div className="flex justify-between">
@@ -484,21 +484,21 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           {/* PERFIL */}
           {activeTab === 'profile' && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-medium text-text-primary border-b border-white/10 pb-2 mb-4">Perfil</h3>
+            <div className="space-y-8">
+              <h3 className="text-2xl font-bold text-text-primary border-b border-white/10 pb-4 mb-6">Perfil</h3>
 
-              <div className="max-w-md space-y-4">
+              <div className="max-w-md space-y-6">
                 <div>
-                  <label className="block text-sm text-text-secondary mb-1">Nome de Exibição</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Nome de Exibição</label>
                   <input
                     type="text"
                     value={displayName}
                     onChange={e => setDisplayName(e.target.value)}
-                    className="w-full bg-bg-tertiary border border-white/10 rounded p-2 text-sm focus:border-accent-primary"
+                    className="w-full bg-bg-tertiary border border-white/10 rounded-md p-2.5 text-sm text-text-primary focus:border-accent-primary focus:ring-1 focus:ring-accent-primary transition-all shadow-inner"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-text-secondary mb-1">Bio</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Bio</label>
                   <textarea
                     value={bio}
                     onChange={e => setBio(e.target.value)}
@@ -518,14 +518,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       placeholder="Senha atual"
                       value={currentPassword}
                       onChange={e => setCurrentPassword(e.target.value)}
-                      className="w-full bg-bg-tertiary border border-white/10 rounded p-2 text-sm focus:border-accent-primary"
+                      className="w-full bg-bg-tertiary border border-white/10 rounded-md p-2.5 text-sm text-text-primary focus:border-accent-primary focus:ring-1 focus:ring-accent-primary transition-all shadow-inner"
                     />
                     <input
                       type="password"
                       placeholder="Nova senha"
                       value={newPassword}
                       onChange={e => setNewPassword(e.target.value)}
-                      className="w-full bg-bg-tertiary border border-white/10 rounded p-2 text-sm focus:border-accent-primary"
+                      className="w-full bg-bg-tertiary border border-white/10 rounded-md p-2.5 text-sm text-text-primary focus:border-accent-primary focus:ring-1 focus:ring-accent-primary transition-all shadow-inner"
                     />
                     <Button variant="secondary" onClick={handleChangePassword}>Atualizar Senha</Button>
                   </div>
@@ -536,7 +536,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           {/* OLLAMA */}
           {activeTab === 'ollama' && (
-            <div className="space-y-6">
+            <div className="space-y-8">
               <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-4">
                 <h3 className="text-lg font-medium text-text-primary">Servidor Ollama Local</h3>
                 <div className="flex items-center gap-2 text-sm">
@@ -595,8 +595,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           {/* ADMIN */}
           {activeTab === 'admin' && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-medium text-text-primary border-b border-white/10 pb-2 mb-4">Administração</h3>
+            <div className="space-y-8">
+              <h3 className="text-2xl font-bold text-text-primary border-b border-white/10 pb-4 mb-6">Administração</h3>
 
               <div className="flex justify-between items-center">
                 <h4 className="text-sm font-medium">Usuários do Sistema</h4>

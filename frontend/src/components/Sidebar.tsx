@@ -218,7 +218,7 @@ export default function Sidebar() {
       >
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-3 top-6 z-10 w-6 h-6 rounded-full glass-panel flex items-center justify-center text-text-secondary hover:text-accent-primary"
+          className="absolute -right-3 top-6 z-10 w-6 h-6 rounded-full glass-panel flex items-center justify-center text-text-secondary hover:text-accent-primary hover:scale-110 transition-transform shadow-md cursor-pointer"
         >
           {isCollapsed ? '▶' : '◀'}
         </button>
@@ -259,21 +259,22 @@ export default function Sidebar() {
           <>
             {/* Barra de busca */}
             <div className="px-3 py-2 border-b border-white/5">
-              <div className="relative">
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-text-muted pointer-events-none">🔍</span>
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={e => handleSearch(e.target.value)}
-                  placeholder="🔍 Buscar notas..."
-                  className="w-full bg-bg-tertiary/60 border border-white/8 rounded-md px-3 py-1.5 text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary/50 transition-colors"
+                  placeholder="Pesquisar notas..."
+                  className="w-full bg-bg-tertiary/60 border border-white/8 rounded-md pl-9 pr-8 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary/50 transition-all focus:ring-1 focus:ring-accent-primary/50 shadow-inner"
                 />
                 {searching && (
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-accent-primary animate-pulse">...</span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-accent-primary animate-pulse">...</span>
                 )}
-                {searchQuery && (
+                {searchQuery && !searching && (
                   <button
                     onClick={() => { setSearchQuery(''); setSearchResults(null) }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-[11px]"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-[11px] transition-colors"
                   >
                     ✕
                   </button>

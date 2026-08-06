@@ -188,7 +188,7 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
             <input
               value={title}
               onChange={handleTitleChange}
-              className="flex-1 bg-transparent text-text-primary text-xl font-bold focus:outline-none placeholder-text-muted"
+              className="flex-1 bg-transparent text-text-primary text-2xl font-bold focus:outline-none placeholder-text-muted placeholder:font-normal"
               placeholder="Título da nota..."
             />
 
@@ -198,13 +198,13 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
               </span>
 
               {/* View Mode Toggle */}
-              <div className="flex bg-bg-tertiary rounded-md p-1 mr-2 border border-white/5">
+              <div className="flex bg-bg-tertiary rounded-lg p-1 mr-2 border border-white/5 shadow-inner">
                 {(['markdown', 'whiteboard', 'dataview'] as const).map(mode => (
                   <button
                     key={mode}
                     onClick={() => setViewMode(mode)}
-                    className={`px-2 py-1 text-[10px] rounded uppercase font-bold tracking-wider transition-colors ${
-                      viewMode === mode ? 'bg-accent-primary/20 text-accent-primary' : 'text-text-muted hover:text-text-secondary'
+                    className={`px-2.5 py-1.5 text-[10px] rounded uppercase font-bold tracking-wider transition-all ${
+                      viewMode === mode ? 'bg-accent-primary text-bg-primary shadow-sm' : 'text-text-muted hover:text-text-primary hover:bg-white/5'
                     }`}
                     title={`Modo ${mode}`}
                   >
@@ -215,7 +215,7 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
 
               <button
                 onClick={() => setShowTagPanel(!showTagPanel)}
-                className={`px-3 py-1.5 text-xs rounded transition-colors flex items-center gap-1 ${showTagPanel ? 'bg-accent-primary/20 text-accent-primary' : 'bg-white/5 hover:bg-white/10 text-text-secondary'}`}
+                className={`px-3 py-1.5 text-xs rounded-md transition-all font-medium flex items-center gap-1.5 shadow-sm ${showTagPanel ? 'bg-accent-primary/20 text-accent-primary' : 'bg-white/5 hover:bg-white/10 text-text-secondary'}`}
               >
                 🏷️ Tags <span className="bg-white/10 px-1.5 rounded-full text-[10px] ml-1">{tags.length}</span>
               </button>
@@ -223,13 +223,13 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
               <div className="relative">
                 <button
                   onClick={() => setShowVersions(!showVersions)}
-                  className="px-3 py-1.5 text-xs bg-white/5 hover:bg-white/10 text-text-secondary rounded transition-colors"
+                  className="px-3 py-1.5 text-xs bg-bg-tertiary hover:bg-white/10 text-text-secondary hover:text-text-primary rounded-md transition-all shadow-sm font-medium"
                   title="Histórico de Versões"
                 >
                   ⏱️
                 </button>
                 {showVersions && (
-                  <div className="absolute right-0 mt-2 w-64 glass-panel border border-accent-primary/20 rounded-md shadow-xl py-2 z-50">
+                  <div className="absolute right-0 mt-2 w-72 glass-panel border border-accent-primary/30 rounded-lg shadow-2xl py-2 z-50 backdrop-blur-xl">
                     <div className="px-3 pb-2 mb-2 border-b border-white/10 text-xs font-semibold text-accent-primary text-glow-neon">
                       Histórico de Versões
                     </div>
@@ -264,7 +264,7 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
                     toast.error('Erro ao forçar re-embedding');
                   }
                 }}
-                className="px-3 py-1.5 text-xs bg-white/5 hover:bg-white/10 text-text-secondary rounded transition-colors"
+                className="px-3 py-1.5 text-xs bg-bg-tertiary hover:bg-white/10 text-text-secondary hover:text-text-primary rounded-md transition-all shadow-sm font-medium"
                 title="Forçar Re-embedding"
               >
                 🔄
@@ -272,7 +272,7 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
 
               <button
                 onClick={toggleFocusMode}
-                className="px-3 py-1.5 text-xs bg-white/5 hover:bg-white/10 text-text-secondary rounded transition-colors"
+                className="px-3 py-1.5 text-xs bg-bg-tertiary hover:bg-white/10 text-text-secondary hover:text-text-primary rounded-md transition-all shadow-sm font-medium"
                 title="Modo Escritor (Focus)"
               >
                 ⤢ Focus
@@ -286,7 +286,7 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
               <input
                 value={title}
                 onChange={handleTitleChange}
-                className="w-full bg-transparent text-text-primary text-3xl font-bold focus:outline-none placeholder-text-muted"
+                className="w-full bg-transparent text-text-primary text-4xl font-extrabold tracking-tight focus:outline-none placeholder-text-muted placeholder:font-normal"
                 placeholder="Título da nota..."
               />
            </div>
