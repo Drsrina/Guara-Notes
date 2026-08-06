@@ -218,7 +218,10 @@ export default function Sidebar() {
       >
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-3 top-6 z-10 w-6 h-6 rounded-full glass-panel flex items-center justify-center text-text-secondary hover:text-accent-primary hover:scale-110 transition-transform shadow-md cursor-pointer"
+          className="absolute -right-3 top-6 z-10 w-6 h-6 rounded-full glass-panel flex items-center justify-center text-text-secondary hover:text-accent-primary hover:scale-110 transition-transform shadow-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
+          aria-label={isCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+          title={isCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+          aria-expanded={!isCollapsed}
         >
           {isCollapsed ? '▶' : '◀'}
         </button>
@@ -235,7 +238,8 @@ export default function Sidebar() {
               <button
                 onClick={() => setShowSettings(true)}
                 title="Configurações"
-                className="text-text-muted hover:text-text-primary transition-colors text-sm"
+                aria-label="Configurações"
+                className="text-text-muted hover:text-text-primary transition-colors text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary rounded"
               >
                 ⚙️
               </button>
@@ -274,7 +278,9 @@ export default function Sidebar() {
                 {searchQuery && !searching && (
                   <button
                     onClick={() => { setSearchQuery(''); setSearchResults(null) }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-[11px] transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary rounded"
+                    aria-label="Limpar busca"
+                    title="Limpar busca"
                   >
                     ✕
                   </button>
@@ -346,7 +352,8 @@ export default function Sidebar() {
                               }
                             } catch {}
                           }}
-                          className="w-full flex items-center px-2 py-1.5 text-sm text-text-secondary hover:bg-white/5 rounded-lg cursor-pointer transition-colors"
+                          className="w-full flex items-center px-2 py-1.5 text-sm text-text-secondary hover:bg-white/5 rounded-lg cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
+                          aria-expanded={isExpanded}
                         >
                           <span className="mr-1.5 text-xs opacity-60">{isExpanded ? '▼' : '▶'}</span>
                           <span className="mr-1.5">📁</span>

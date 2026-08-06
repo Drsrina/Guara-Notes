@@ -21,7 +21,9 @@ export function PanelHeader({ title, onClose, onSplit, onChangeType, onExportMd,
         <div className="relative">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-text-secondary transition-colors"
+            aria-label="Menu do painel"
+            aria-expanded={menuOpen}
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-text-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
           >
             ⋮
           </button>
@@ -53,7 +55,9 @@ export function PanelHeader({ title, onClose, onSplit, onChangeType, onExportMd,
         {onClose && (
           <button
             onClick={onClose}
-            className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-text-secondary hover:text-red-400 transition-colors"
+            aria-label="Fechar aba"
+            title="Fechar aba"
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-text-secondary hover:text-red-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
           >
             ✕
           </button>

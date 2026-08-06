@@ -132,7 +132,9 @@ export default function AIChat({ inline = false, noteId, paneId }: AIChatProps) 
           <button
             onClick={handleSend}
             disabled={loading || !input.trim()}
-            className="absolute right-2 top-2 p-1 text-accent-primary hover:text-accent-glow disabled:opacity-30 transition-colors"
+            className="absolute right-2 top-2 p-1 text-accent-primary hover:text-accent-glow disabled:opacity-30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary rounded"
+            aria-label="Enviar mensagem"
+            title="Enviar mensagem"
           >
             ➤
           </button>
