@@ -106,18 +106,28 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   }
 
   const handleCreateUser = async () => {
+    if (!newUsername.trim() || !newUserPass.trim() || !newUserName.trim()) {
+      toast.error('Preencha username, nome e senha')
+      return
+    }
     try {
       await adminApi.createUser({
-        username: newUsername,
+        username: newUsername.trim(),
         password: newUserPass,
-        display_name: newUserName,
+        display_name: newUserName.trim(),
         is_admin: newUserAdmin
       })
-      toast.success('Usuário criado!')
+      toast.success(`Usuário '${newUsername}' criado!`)
+      // Reset form
+      setNewUsername('')
+      setNewUserName('')
+      setNewUserPass('')
+      setNewUserAdmin(false)
       setShowNewUser(false)
       loadAdminUsers()
-    } catch (e) {
-      toast.error('Erro ao criar usuário')
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail
+      toast.error(detail ? `Erro: ${detail}` : 'Erro ao criar usuário')
     }
   }
 

@@ -126,13 +126,31 @@ export default function Graph2D() {
         width={dimensions.width}
         height={dimensions.height}
         graphData={processedGraphData}
-        nodeLabel="name"
+        nodeLabel=""
         nodeColor={getNodeColor}
         nodeRelSize={getNodeSize()}
         linkColor={(link: any) => link.type === 'wikilink' ? 'rgba(255,140,66,0.6)' : 'rgba(99,179,237,0.4)'}
         linkWidth={(link: any) => (link.value || 0.5) * 2}
         backgroundColor="#0F0F1E"
         onNodeClick={handleNodeClick}
+        nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+          const size = getNodeSize()
+          const color = getNodeColor(node)
+          // Draw node circle
+          ctx.beginPath()
+          ctx.arc(node.x, node.y, size, 0, 2 * Math.PI)
+          ctx.fillStyle = color
+          ctx.fill()
+          // Draw label above node
+          const label = node.name || ''
+          const fontSize = Math.max(8, 12 / globalScale)
+          ctx.font = `${fontSize}px Inter, sans-serif`
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'bottom'
+          ctx.fillStyle = 'rgba(255,255,255,0.85)'
+          ctx.fillText(label, node.x, node.y - size - 2)
+        }}
+        nodeCanvasObjectMode={() => 'replace'}
       />
     </div>
   )

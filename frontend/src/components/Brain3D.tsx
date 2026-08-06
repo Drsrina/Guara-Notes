@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useMemo } from 'react'
 import ForceGraph3D from 'react-force-graph-3d'
 import { graphApi, type GraphNode } from '../api/graph'
 import { useAppStore, useTagsStore, useSettingsStore, useWorkspaceStore } from '../store'
+import * as THREE from 'three'
 
 function cosineSim(vecA: number[], vecB: number[]) {
   let dotProduct = 0
@@ -167,12 +168,12 @@ export default function Brain3D() {
       </div>
 
       <div className="w-full h-full flex-1">
-        <ForceGraph3D
+      <ForceGraph3D
           ref={fgRef}
           width={dimensions.width}
           height={dimensions.height}
           graphData={{ nodes: processedNodes, links }}
-          nodeLabel="title"
+          nodeLabel=""
           nodeColor={getNodeColor}
           nodeResolution={16}
           linkColor={() => 'rgba(255, 107, 26, 0.4)'}
@@ -182,6 +183,26 @@ export default function Brain3D() {
           backgroundColor="#0F0F1E"
           enableNodeDrag={false}
           showNavInfo={false}
+          nodeThreeObject={(node: any) => {
+            // Canvas sprite for label above sphere
+            const canvas = document.createElement('canvas')
+            const ctx = canvas.getContext('2d')!
+            const label = node.title || ''
+            canvas.width = 256
+            canvas.height = 64
+            ctx.font = 'bold 20px Inter, sans-serif'
+            ctx.fillStyle = 'rgba(255,255,255,0.92)'
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillText(label.length > 22 ? label.slice(0, 20) + '…' : label, 128, 32)
+            const texture = new THREE.CanvasTexture(canvas)
+            const material = new THREE.SpriteMaterial({ map: texture, depthWrite: false })
+            const sprite = new THREE.Sprite(material)
+            sprite.scale.set(20, 5, 1)
+            sprite.position.set(0, 7, 0) // above sphere
+            return sprite
+          }}
+          nodeThreeObjectExtend={true}
         />
       </div>
     </div>
