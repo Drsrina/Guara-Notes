@@ -8,6 +8,8 @@ import { adminApi } from '../api/admin'
 import type { UserAdminView } from '../api/admin'
 import { ollamaApi } from '../api/ollama'
 import type { OllamaModelInfo, OllamaStatus } from '../api/ollama'
+import { systemApi } from '../api/system'
+import type { SystemStatus, RedisMetrics, PostgresMetrics, EnvConfig } from '../api/system'
 import { confirmDialog } from './ui/Dialogs'
 import toast from 'react-hot-toast'
 
@@ -16,7 +18,7 @@ interface SettingsModalProps {
   onClose: () => void
 }
 
-type TabId = 'appearance' | 'editor' | 'graph' | 'ai' | 'data' | 'profile' | 'admin' | 'ollama'
+type TabId = 'appearance' | 'editor' | 'graph' | 'ai' | 'data' | 'profile' | 'admin' | 'ollama' | 'redis' | 'postgres' | 'system'
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>('appearance')
@@ -43,6 +45,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([])
   const [pullModelName, setPullModelName] = useState('')
   const [pullProgress, setPullProgress] = useState<any>(null)
+  const [isPulling, setIsPulling] = useState(false)
+
+  // System / Redis / Postgres state
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null)
+  const [redisMetrics, setRedisMetrics] = useState<RedisMetrics | null>(null)
+  const [postgresMetrics, setPostgresMetrics] = useState<PostgresMetrics | null>(null)
+  const [envConfig, setEnvConfig] = useState<EnvConfig | null>(null)
+  const [envEdits, setEnvEdits] = useState<Partial<EnvConfig>>({})
+  const [systemLoading, setSystemLoading] = useState(false)
+  const [vacuumLoading, setVacuumLoading] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -50,6 +62,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         loadAdminUsers()
       } else if (activeTab === 'ollama' && user?.is_admin) {
         loadOllamaData()
+      } else if (activeTab === 'system' && user?.is_admin) {
+        loadSystemData()
+      } else if (activeTab === 'redis' && user?.is_admin) {
+        loadRedisData()
+      } else if (activeTab === 'postgres' && user?.is_admin) {
+        loadPostgresData()
       }
     }
   }, [isOpen, activeTab, user?.is_admin])
@@ -128,15 +146,18 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   }
 
   const handlePullModel = () => {
-    if (!pullModelName) return
-    setPullProgress({ status: 'Iniciando...' })
+    if (!pullModelName || isPulling) return
+    setIsPulling(true)
+    setPullProgress({ status: 'Iniciando...', completed: 0, total: 0 })
     ollamaApi.pullModelSSE(
       pullModelName,
       (data) => setPullProgress(data),
-      (err) => toast.error(`Erro: ${err}`),
+      (err) => { toast.error(`Erro: ${err}`); setIsPulling(false) },
       () => {
-        setPullProgress({ status: 'Concluído' })
-        setTimeout(() => setPullProgress(null), 3000)
+        setPullProgress({ status: 'Concluído ✅', completed: 1, total: 1 })
+        setIsPulling(false)
+        setPullModelName('')
+        setTimeout(() => setPullProgress(null), 4000)
         loadOllamaData()
       }
     )
@@ -178,6 +199,77 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     URL.revokeObjectURL(url)
   }
 
+  // --- System / Redis / Postgres Actions ---
+  const loadSystemData = async () => {
+    try {
+      setSystemLoading(true)
+      const [statusRes, envRes] = await Promise.all([
+        systemApi.getStatus(),
+        systemApi.getEnvConfig(),
+      ])
+      setSystemStatus(statusRes.data)
+      setEnvConfig(envRes.data)
+      setEnvEdits({})
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSystemLoading(false)
+    }
+  }
+
+  const loadRedisData = async () => {
+    try {
+      const res = await systemApi.getRedisMetrics()
+      setRedisMetrics(res.data)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const loadPostgresData = async () => {
+    try {
+      const res = await systemApi.getPostgresMetrics()
+      setPostgresMetrics(res.data)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const handleSaveEnv = async () => {
+    try {
+      await systemApi.updateEnvConfig(envEdits)
+      toast.success('Configurações salvas! Algumas mudanças requerem restart.')
+      loadSystemData()
+    } catch (e) {
+      toast.error('Erro ao salvar configurações')
+    }
+  }
+
+  const handleVacuum = async () => {
+    try {
+      setVacuumLoading(true)
+      await systemApi.runVacuum()
+      toast.success('VACUUM ANALYZE executado com sucesso!')
+      loadPostgresData()
+    } catch (e: any) {
+      toast.error('Erro: ' + (e.response?.data?.detail || e.message))
+    } finally {
+      setVacuumLoading(false)
+    }
+  }
+
+  const handleFlushQueue = async () => {
+    confirmDialog('Limpar Fila', 'Remover todas as tarefas pendentes da fila Celery?', async () => {
+      try {
+        await systemApi.flushQueue()
+        toast.success('Fila limpa com sucesso!')
+        loadRedisData()
+      } catch (e) {
+        toast.error('Erro ao limpar fila')
+      }
+    })
+  }
+
   const tabs: { id: TabId, label: string, icon: string, adminOnly?: boolean }[] = [
     { id: 'appearance', label: 'Aparência', icon: '🎨' },
     { id: 'editor', label: 'Editor', icon: '📝' },
@@ -186,13 +278,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     { id: 'data', label: 'Dados & Sync', icon: '💾' },
     { id: 'profile', label: 'Perfil', icon: '👤' },
     { id: 'ollama', label: 'Ollama', icon: '🦙', adminOnly: true },
-    { id: 'admin', label: 'Admin', icon: '🛡️', adminOnly: true },
+    { id: 'redis', label: 'Redis', icon: '🔴', adminOnly: true },
+    { id: 'postgres', label: 'PostgreSQL', icon: '🐘', adminOnly: true },
+    { id: 'system', label: 'Sistema', icon: '🖥️', adminOnly: true },
+    { id: 'admin', label: 'Usuários', icon: '🛡️', adminOnly: true },
   ]
 
   const visibleTabs = tabs.filter(t => !t.adminOnly || user?.is_admin)
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Configurações" className="w-[800px] max-w-[95vw] h-[600px] max-h-[90vh]">
+    <Modal isOpen={isOpen} onClose={onClose} title="Configurações" className="w-[900px] max-w-[95vw] h-[680px] max-h-[90vh]">
       <div className="flex h-full -mx-6 -my-6">
         {/* Sidebar Tabs */}
         <div className="w-56 border-r border-white/10 bg-bg-secondary/30 p-4 flex flex-col gap-1 overflow-y-auto custom-scrollbar">
@@ -652,6 +747,192 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {/* REDIS */}
+          {activeTab === 'redis' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <h3 className="text-xl font-bold text-text-primary">🔴 Redis</h3>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${redisMetrics?.status === 'online' ? 'bg-green-500 shadow-[0_0_6px_#22c55e]' : 'bg-red-500'}`} />
+                  <span className="text-xs text-text-muted">{redisMetrics?.version ? `v${redisMetrics.version}` : 'verificando...'}</span>
+                  <Button variant="ghost" size="sm" onClick={loadRedisData}>↻</Button>
+                </div>
+              </div>
+              {redisMetrics ? (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {[
+                      { label: 'Memória Usada', value: redisMetrics.used_memory_human },
+                      { label: 'Pico de Memória', value: redisMetrics.used_memory_peak_human },
+                      { label: 'Limite Máximo', value: redisMetrics.maxmemory_human },
+                      { label: 'Clientes Conectados', value: String(redisMetrics.connected_clients) },
+                      { label: 'Uptime', value: `${redisMetrics.uptime_days}d` },
+                      { label: 'AOF Persistência', value: redisMetrics.aof_enabled ? '✅ Ativo' : '⚠️ Inativo' },
+                    ].map(stat => (
+                      <div key={stat.label} className="bg-bg-tertiary/40 p-3 rounded-lg border border-white/5">
+                        <div className="text-xs text-text-muted mb-1">{stat.label}</div>
+                        <div className="text-sm font-semibold text-text-primary">{stat.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="bg-bg-tertiary/40 p-4 rounded-lg border border-white/5">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <div className="text-sm font-medium text-text-primary">Fila Celery</div>
+                        <div className="text-xs text-text-muted">{redisMetrics.queue_length} tarefas pendentes</div>
+                      </div>
+                      <Button variant="secondary" size="sm" onClick={handleFlushQueue}>🗑️ Limpar</Button>
+                    </div>
+                    <div className="w-full bg-bg-primary rounded-full h-2">
+                      <div className="bg-red-500 h-2 rounded-full" style={{ width: `${Math.min(redisMetrics.queue_length * 10, 100)}%` }} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-xs text-text-muted">
+                    <div>Cache Hits: <span className="text-green-400">{redisMetrics.keyspace_hits?.toLocaleString()}</span></div>
+                    <div>Cache Misses: <span className="text-red-400">{redisMetrics.keyspace_misses?.toLocaleString()}</span></div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-text-muted text-sm">Carregando métricas do Redis...</div>
+              )}
+            </div>
+          )}
+
+          {/* POSTGRESQL */}
+          {activeTab === 'postgres' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <h3 className="text-xl font-bold text-text-primary">🐘 PostgreSQL</h3>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${postgresMetrics?.status === 'online' ? 'bg-green-500 shadow-[0_0_6px_#22c55e]' : 'bg-red-500'}`} />
+                  <span className="text-xs text-text-muted">{postgresMetrics?.version ? `v${postgresMetrics.version}` : 'verificando...'}</span>
+                  <Button variant="ghost" size="sm" onClick={loadPostgresData}>↻</Button>
+                </div>
+              </div>
+              {postgresMetrics ? (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {[
+                      { label: 'Tamanho do Banco', value: postgresMetrics.database_size },
+                      { label: 'Conexões Ativas', value: String(postgresMetrics.active_connections) },
+                      { label: 'Total de Notas', value: String(postgresMetrics.notes_total) },
+                      { label: 'Notas com Embedding', value: `${postgresMetrics.notes_embedded} / ${postgresMetrics.notes_total}` },
+                      { label: 'Usuários', value: String(postgresMetrics.users_total) },
+                      { label: 'Links entre Notas', value: String(postgresMetrics.links_total) },
+                    ].map(stat => (
+                      <div key={stat.label} className="bg-bg-tertiary/40 p-3 rounded-lg border border-white/5">
+                        <div className="text-xs text-text-muted mb-1">{stat.label}</div>
+                        <div className="text-sm font-semibold text-text-primary">{stat.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {postgresMetrics.notes_total > 0 && (
+                    <div>
+                      <div className="flex justify-between text-xs text-text-muted mb-1">
+                        <span>Progresso de Embeddings</span>
+                        <span>{Math.round(postgresMetrics.notes_embedded / postgresMetrics.notes_total * 100)}%</span>
+                      </div>
+                      <div className="w-full bg-bg-primary rounded-full h-2">
+                        <div className="bg-accent-primary h-2 rounded-full" style={{ width: `${postgresMetrics.notes_embedded / postgresMetrics.notes_total * 100}%` }} />
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex gap-3 pt-2 items-center">
+                    <Button variant="secondary" onClick={handleVacuum} disabled={vacuumLoading}>
+                      {vacuumLoading ? '⏳ Executando...' : '🧹 VACUUM ANALYZE'}
+                    </Button>
+                    <span className="text-xs text-text-muted">Otimiza o banco e recalcula estatísticas</span>
+                  </div>
+                </>
+              ) : (
+                <div className="text-text-muted text-sm">Carregando métricas do PostgreSQL...</div>
+              )}
+            </div>
+          )}
+
+          {/* SISTEMA */}
+          {activeTab === 'system' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <h3 className="text-xl font-bold text-text-primary">🖥️ Sistema</h3>
+                <Button variant="ghost" size="sm" onClick={loadSystemData} disabled={systemLoading}>
+                  {systemLoading ? '⏳' : '↻'} Atualizar
+                </Button>
+              </div>
+
+              {systemStatus && (
+                <div>
+                  <h4 className="text-sm font-medium text-text-secondary mb-3">Status dos Serviços</h4>
+                  <div className="space-y-2">
+                    {(Object.entries(systemStatus) as [string, any][]).map(([svc, info]) => (
+                      <div key={svc} className="flex items-center justify-between bg-bg-tertiary/40 px-4 py-2.5 rounded-lg border border-white/5">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-2 h-2 rounded-full ${info.status === 'online' ? 'bg-green-500 shadow-[0_0_6px_#22c55e]' : info.status === 'offline' ? 'bg-red-500' : 'bg-yellow-500'}`} />
+                          <span className="text-sm font-medium text-text-primary capitalize">{svc}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs">
+                          {info.version && <span className="text-text-muted">v{info.version}</span>}
+                          {info.queue_length !== undefined && <span className="text-text-muted">{info.queue_length} na fila</span>}
+                          {info.error && <span className="text-red-400 truncate max-w-[180px]" title={info.error}>{info.error}</span>}
+                          <span className={`font-semibold ${info.status === 'online' ? 'text-green-400' : info.status === 'offline' ? 'text-red-400' : 'text-yellow-400'}`}>
+                            {info.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {envConfig && (
+                <div>
+                  <h4 className="text-sm font-medium text-text-secondary mb-3">Configurações de Ambiente</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {([
+                      { key: 'AI_PROVIDER', label: 'Provider de IA', type: 'select', options: ['local', 'gemini', 'claude'] as const },
+                      { key: 'OLLAMA_MODEL_CHAT', label: 'Modelo Chat', type: 'text' },
+                      { key: 'OLLAMA_MODEL_EMBED', label: 'Modelo Embed', type: 'text' },
+                      { key: 'GEMINI_API_KEY', label: 'Gemini API Key', type: 'password' },
+                      { key: 'CLAUDE_API_KEY', label: 'Claude API Key', type: 'password' },
+                      { key: 'SEMANTIC_THRESHOLD', label: 'Limiar Semântico', type: 'text' },
+                      { key: 'SEMANTIC_TOP_K', label: 'Links Semânticos Max', type: 'text' },
+                      { key: 'RAG_TOP_K', label: 'Contexto RAG (Top K)', type: 'text' },
+                      { key: 'CORS_ORIGINS', label: 'CORS Origins', type: 'text' },
+                    ]).map(({ key, label, type, options }) => (
+                      <div key={key}>
+                        <label className="block text-xs text-text-muted mb-1">{label}</label>
+                        {type === 'select' ? (
+                          <select
+                            value={(envEdits as any)[key] ?? (envConfig as any)[key]}
+                            onChange={e => setEnvEdits(prev => ({ ...prev, [key]: e.target.value }))}
+                            className="w-full bg-bg-tertiary border border-white/10 rounded p-2 text-sm text-text-primary focus:border-accent-primary"
+                          >
+                            {(options || []).map((o: string) => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        ) : (
+                          <input
+                            type={type}
+                            value={(envEdits as any)[key] ?? ((envConfig as any)[key] || '')}
+                            onChange={e => setEnvEdits(prev => ({ ...prev, [key]: e.target.value }))}
+                            className="w-full bg-bg-tertiary border border-white/10 rounded p-2 text-sm text-text-primary focus:border-accent-primary font-mono"
+                            placeholder={type === 'password' ? '(não alterada)' : ''}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {Object.keys(envEdits).length > 0 && (
+                    <div className="mt-4 flex items-center gap-3 flex-wrap">
+                      <Button variant="primary" onClick={handleSaveEnv}>💾 Salvar Configurações</Button>
+                      <Button variant="ghost" onClick={() => setEnvEdits({})}>Cancelar</Button>
+                      <span className="text-xs text-yellow-400">⚠️ API Keys requerem restart do backend</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

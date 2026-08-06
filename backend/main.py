@@ -8,7 +8,7 @@ from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
 
 from .database import AsyncSessionLocal
-from .routers import auth, notes, folders, graph, ai, admin, ollama
+from .routers import auth, notes, folders, graph, ai, admin, ollama, system
 from . import models
 from .auth import get_password_hash
 
@@ -106,6 +106,7 @@ app.include_router(graph.router)
 app.include_router(ai.router)
 app.include_router(admin.router)
 app.include_router(ollama.router)
+app.include_router(system.router)
 
 
 @app.get("/")
