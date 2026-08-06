@@ -294,7 +294,7 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
 
         {/* View Area */}
         <div 
-          className={`flex-1 overflow-hidden relative ${settings.editorMaxWidth && inFocusMode ? 'max-w-4xl mx-auto w-full' : 'w-full'}`} 
+          className={`flex-1 overflow-hidden relative ${settings.editorMaxWidth ? 'max-w-3xl mx-auto w-full px-4 sm:px-8' : 'w-full px-4'}`}
           ref={editorRef}
           onContextMenu={(e) => {
             openCtx(e, [
@@ -314,8 +314,8 @@ export default function Editor({ noteId, inFocusMode = false, panelId }: EditorP
               onChange={handleContentChange}
               height="100%"
               preview={settings.livePreview ? 'live' : 'edit'}
-              className="!h-full !bg-transparent !border-none custom-scrollbar"
-              style={{ height: '100%', fontSize: `${settings.editorFontSize}px` }}
+              className={`!h-full !bg-transparent !border-none custom-scrollbar font-${settings.fontFamily} leading-${settings.lineHeight}`}
+              style={{ height: '100%', fontSize: `${settings.editorFontSize}px`, paddingTop: '1rem', paddingBottom: '1rem' }}
               textareaProps={{
                 placeholder: 'Comece a escrever... (Markdown suportado, use [[título]] para wikilinks)',
               }}

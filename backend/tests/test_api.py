@@ -8,4 +8,4 @@ async def test_read_main():
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         response = await ac.get("/")
     assert response.status_code == 200
-    assert response.json() == {"message": "Welcome to Guara-Notes API"}
+    assert response.json() == {"message": "Guará-Notes API v1.1 — online 🐺"}

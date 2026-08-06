@@ -104,3 +104,33 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 107, 26, 0.4);
 }
+
+/* Editor Typography overrides */
+.wmde-markdown, .w-md-editor-text-input {
+  font-family: inherit !important;
+  line-height: inherit !important;
+}
+
+.font-sans {
+  font-family: 'Inter', sans-serif !important;
+}
+
+.font-serif {
+  font-family: 'Merriweather', serif !important;
+}
+
+.font-mono {
+  font-family: 'Fira Code', monospace !important;
+}
+
+.leading-tight {
+  line-height: 1.25 !important;
+}
+
+.leading-normal {
+  line-height: 1.6 !important;
+}
+
+.leading-relaxed {
+  line-height: 1.8 !important;
+}

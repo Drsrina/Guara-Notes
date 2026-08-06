@@ -28,7 +28,7 @@ export const ollamaApi = {
   
   deleteModel: (modelName: string) => api.delete(`/ollama/models/${encodeURIComponent(modelName)}`),
   
-  updateConfig: (config: { chat_model?: string; embed_model?: string }) => 
+  updateConfig: (config: { chat_model?: string; embed_model?: string; ollama_url?: string }) =>
     api.put('/ollama/config', config),
 
   // Método especial para consumir o SSE

@@ -127,13 +127,13 @@ async def search_notes(
     if mode in ("semantic", "hybrid"):
         # Gera embedding da query via Ollama
         import httpx
-        OLLAMA_URL = __import__("os").getenv("OLLAMA_URL", "http://ollama:11434")
-        EMBED_MODEL = __import__("os").getenv("OLLAMA_MODEL_EMBED", "nomic-embed-text")
+        ollama_url = __import__("os").getenv("OLLAMA_URL", "http://ollama:11434")
+        embed_model = __import__("os").getenv("OLLAMA_MODEL_EMBED", "nomic-embed-text")
         query_vec = []
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 r = await client.post(
-                    f"{OLLAMA_URL}/api/embeddings",
+                    f"{ollama_url}/api/embeddings",
                     json={"model": EMBED_MODEL, "prompt": q},
                 )
                 r.raise_for_status()

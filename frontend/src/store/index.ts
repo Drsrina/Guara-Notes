@@ -46,6 +46,8 @@ export interface GlobalSettings {
   animations: 'smooth' | 'fast' | 'off'
 
   // Editor
+  fontFamily: 'sans' | 'serif' | 'mono'
+  lineHeight: 'tight' | 'normal' | 'relaxed'
   indentation: 'spaces' | 'tabs'
   indentSize: number
   wordWrap: boolean
@@ -83,6 +85,8 @@ export const defaultSettings: GlobalSettings = {
   livePreview: true,
   animations: 'smooth',
 
+  fontFamily: 'sans',
+  lineHeight: 'normal',
   indentation: 'spaces',
   indentSize: 2,
   wordWrap: true,
