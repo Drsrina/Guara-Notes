@@ -176,6 +176,7 @@ export interface ChatMessage {
 
 export interface PaneState {
   id: string
+  tabs: TabType[]
   activeTab: TabType
   activeNoteId: string | null
   chatMessages: ChatMessage[]
@@ -189,6 +190,8 @@ interface WorkspaceState {
   focusedPaneId: string | null
   addPane: () => void
   removePane: (id: string) => void
+  addTabToPane: (paneId: string, tab: TabType) => void
+  removeTabFromPane: (paneId: string, tab: TabType) => void
   setActiveTab: (paneId: string, tab: TabType) => void
   setActiveNoteInPane: (paneId: string, noteId: string | null) => void
   setFocusedPane: (paneId: string) => void
@@ -200,7 +203,7 @@ interface WorkspaceState {
   setChatMessages: (paneId: string, messages: ChatMessage[]) => void
 }
 
-const defaultPanes: PaneState[] = [{ id: 'pane-1', activeTab: 'editor', activeNoteId: null, chatMessages: [] }]
+const defaultPanes: PaneState[] = [{ id: 'pane-1', tabs: ['editor', 'graph2d', 'brain3d', 'chat'], activeTab: 'editor', activeNoteId: null, chatMessages: [] }]
 
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
@@ -214,7 +217,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       addPane: () => {
         const { panes } = get()
         if (panes.length >= 4) return
-        const newPane: PaneState = { id: `pane-${Date.now()}`, activeTab: 'editor', activeNoteId: null, chatMessages: [] }
+        const newPane: PaneState = { id: `pane-${Date.now()}`, tabs: ['editor'], activeTab: 'editor', activeNoteId: null, chatMessages: [] }
         set({ panes: [...panes, newPane], focusedPaneId: newPane.id })
       },
 
@@ -224,6 +227,28 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const newPanes = panes.filter(p => p.id !== id)
         set({ panes: newPanes, focusedPaneId: focusedPaneId === id ? newPanes[0].id : focusedPaneId })
       },
+
+      addTabToPane: (paneId, tab) =>
+        set((state) => ({
+          panes: state.panes.map(p => p.id === paneId && !p.tabs.includes(tab) ? { ...p, tabs: [...p.tabs, tab], activeTab: tab } : p),
+          focusedPaneId: paneId,
+        })),
+
+      removeTabFromPane: (paneId, tab) =>
+        set((state) => ({
+          panes: state.panes.map(p => {
+            if (p.id === paneId) {
+              const newTabs = p.tabs.filter(t => t !== tab)
+              // if active tab is removed, select another one or fallback
+              let newActiveTab = p.activeTab
+              if (p.activeTab === tab) {
+                newActiveTab = newTabs.length > 0 ? newTabs[newTabs.length - 1] : 'editor'
+              }
+              return { ...p, tabs: newTabs.length > 0 ? newTabs : ['editor'], activeTab: newActiveTab }
+            }
+            return p
+          }),
+        })),
 
       setActiveTab: (paneId, tab) =>
         set((state) => ({
