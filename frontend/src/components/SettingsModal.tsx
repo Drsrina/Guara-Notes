@@ -384,6 +384,32 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Fonte da Família</label>
+                  <select
+                    value={settings.fontFamily}
+                    onChange={e => updateSettings({ fontFamily: e.target.value as 'sans' | 'serif' | 'mono' })}
+                    className="w-full bg-bg-tertiary border border-white/10 rounded p-2 text-sm text-text-primary focus:border-accent-primary"
+                  >
+                    <option value="sans">Sans-serif (Moderno)</option>
+                    <option value="serif">Serif (Clássico)</option>
+                    <option value="mono">Monospace (Técnico)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Altura da Linha</label>
+                  <select
+                    value={settings.lineHeight}
+                    onChange={e => updateSettings({ lineHeight: e.target.value as 'tight' | 'normal' | 'relaxed' })}
+                    className="w-full bg-bg-tertiary border border-white/10 rounded p-2 text-sm text-text-primary focus:border-accent-primary"
+                  >
+                    <option value="tight">Justo</option>
+                    <option value="normal">Normal</option>
+                    <option value="relaxed">Relaxado</option>
+                  </select>
+                </div>
+
+                <div>
                   <label className="block text-sm font-medium text-text-secondary mb-2">Tamanho da Fonte (px)</label>
                   <input
                     type="range" min="12" max="24"
@@ -647,6 +673,29 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <div className="flex items-center gap-2 text-sm">
                   <div className={`w-2 h-2 rounded-full ${ollamaStatus?.status === 'online' ? 'bg-green-500' : 'bg-red-500'}`} />
                   <span className="text-text-secondary">{ollamaStatus?.status === 'online' ? `v${ollamaStatus.version}` : 'Offline'}</span>
+                </div>
+              </div>
+
+              {/* Configuração do Host */}
+              <div className="bg-bg-tertiary/30 p-4 rounded-lg border border-white/10">
+                <h4 className="text-sm font-medium mb-3 text-text-primary">Configurar Host (Avançado)</h4>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={ollamaStatus?.ollama_url || ''}
+                    onChange={e => setOllamaStatus(s => s ? { ...s, ollama_url: e.target.value } : null)}
+                    placeholder="ex: http://localhost:11434"
+                    className="flex-1 bg-bg-tertiary border border-white/10 rounded p-2 text-sm focus:border-accent-primary"
+                  />
+                  <Button variant="primary" onClick={async () => {
+                    try {
+                      await ollamaApi.updateConfig({ ollama_url: ollamaStatus?.ollama_url });
+                      toast.success('Ollama Host URL atualizado. Verificando conexão...');
+                      loadOllamaData();
+                    } catch(e) {
+                      toast.error('Erro ao atualizar Ollama Host URL');
+                    }
+                  }}>Salvar Host</Button>
                 </div>
               </div>
 

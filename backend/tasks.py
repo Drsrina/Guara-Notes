@@ -11,8 +11,7 @@ from sqlalchemy import delete, text, update
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-EMBED_MODEL = os.getenv("OLLAMA_MODEL_EMBED", "nomic-embed-text")
+
 
 # Limiar de similaridade coseno para considerar link semântico (0 = idêntico, 1 = oposto)
 SEMANTIC_THRESHOLD = float(os.getenv("SEMANTIC_THRESHOLD", "0.35"))
@@ -26,11 +25,13 @@ SEMANTIC_TOP_K = int(os.getenv("SEMANTIC_TOP_K", "8"))
 
 async def _generate_embedding(text: str) -> list[float]:
     """Chama Ollama para gerar embedding. Retorna lista vazia em caso de erro."""
+    ollama_url = os.getenv("OLLAMA_URL", "http://ollama:11434")
+    embed_model = os.getenv("OLLAMA_MODEL_EMBED", "nomic-embed-text")
     async with httpx.AsyncClient() as client:
         try:
             response = await client.post(
-                f"{OLLAMA_URL}/api/embeddings",
-                json={"model": EMBED_MODEL, "prompt": text},
+                f"{ollama_url}/api/embeddings",
+                json={"model": embed_model, "prompt": text},
                 timeout=60.0,
             )
             response.raise_for_status()

@@ -28,6 +28,7 @@ class OllamaPullRequest(BaseModel):
 class OllamaConfigUpdate(BaseModel):
     chat_model: Optional[str] = None
     embed_model: Optional[str] = None
+    ollama_url: Optional[str] = None
 
 
 @router.get("/status")
@@ -207,6 +208,11 @@ async def update_ollama_config(
         changed["embed_model"] = config.embed_model
         logger.info(f"[ollama] Embed model alterado para '{config.embed_model}' por '{current_admin.username}'")
 
+    if config.ollama_url is not None:
+        os.environ["OLLAMA_URL"] = config.ollama_url
+        changed["ollama_url"] = config.ollama_url
+        logger.info(f"[ollama] Host URL alterado para '{config.ollama_url}' por '{current_admin.username}'")
+
     if not changed:
         raise HTTPException(status_code=400, detail="Nenhum campo fornecido para atualizar.")
 
@@ -217,5 +223,6 @@ async def update_ollama_config(
         "current": {
             "chat_model": os.getenv("OLLAMA_MODEL_CHAT"),
             "embed_model": os.getenv("OLLAMA_MODEL_EMBED"),
+            "ollama_url": os.getenv("OLLAMA_URL"),
         },
     }

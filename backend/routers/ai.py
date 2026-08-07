@@ -16,9 +16,7 @@ from .auth import get_current_user
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 AI_PROVIDER = os.getenv("AI_PROVIDER", "local")
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
-OLLAMA_MODEL_CHAT = os.getenv("OLLAMA_MODEL_CHAT", "llama3.2:3b")
-OLLAMA_MODEL_EMBED = os.getenv("OLLAMA_MODEL_EMBED", "nomic-embed-text")
+
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY", "")
 RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
@@ -31,8 +29,8 @@ RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
 async def _call_ollama(messages: list[dict]) -> str:
     async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(
-            f"{OLLAMA_URL}/api/chat",
-            json={"model": OLLAMA_MODEL_CHAT, "messages": messages, "stream": False},
+            f"{ollama_url}/api/chat",
+            json={"model": ollama_model_chat, "messages": messages, "stream": False},
         )
         response.raise_for_status()
         return response.json()["message"]["content"]
@@ -93,11 +91,13 @@ async def _dispatch_ai(messages: list[dict]) -> str:
 
 async def _embed_query(query: str) -> list[float]:
     """Gera embedding para o query RAG via Ollama."""
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    ollama_url = os.getenv("OLLAMA_URL", "http://ollama:11434")
+    ollama_model_embed = os.getenv("OLLAMA_MODEL_EMBED", "nomic-embed-text")
+    async with httpx.AsyncClient(timeout=10.0) as client:
         try:
             r = await client.post(
-                f"{OLLAMA_URL}/api/embeddings",
-                json={"model": OLLAMA_MODEL_EMBED, "prompt": query},
+                f"{ollama_url}/api/embeddings",
+                json={"model": ollama_model_embed, "prompt": query},
             )
             r.raise_for_status()
             return r.json().get("embedding", [])
