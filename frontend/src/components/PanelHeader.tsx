@@ -20,6 +20,10 @@ export function PanelHeader({ title, onClose, onSplit, onChangeType, onExportMd,
         {/* Menu ⋮ */}
         <div className="relative">
           <button
+            aria-label="Opções do Painel"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            title="Opções do Painel"
             onClick={() => setMenuOpen(!menuOpen)}
             className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-text-secondary transition-colors"
           >
@@ -52,6 +56,8 @@ export function PanelHeader({ title, onClose, onSplit, onChangeType, onExportMd,
 
         {onClose && (
           <button
+            aria-label="Fechar Painel"
+            title="Fechar Painel"
             onClick={onClose}
             className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-text-secondary hover:text-red-400 transition-colors"
           >

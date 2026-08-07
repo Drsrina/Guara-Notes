@@ -217,6 +217,9 @@ export default function Sidebar() {
         className="glass flex flex-col h-full border-r border-white/10 shrink-0 relative transition-all overflow-hidden"
       >
         <button
+          aria-label={isCollapsed ? "Expandir barra lateral" : "Recolher barra lateral"}
+          aria-expanded={!isCollapsed}
+          title={isCollapsed ? "Expandir barra lateral" : "Recolher barra lateral"}
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="absolute -right-3 top-6 z-10 w-6 h-6 rounded-full glass-panel flex items-center justify-center text-text-secondary hover:text-accent-primary hover:scale-110 transition-transform shadow-md cursor-pointer"
         >
@@ -233,6 +236,7 @@ export default function Sidebar() {
             )}
             <div className={`flex gap-2 items-center ${isCollapsed ? 'flex-col' : ''}`}>
               <button
+                aria-label="Configurações"
                 onClick={() => setShowSettings(true)}
                 title="Configurações"
                 className="text-text-muted hover:text-text-primary transition-colors text-sm"
@@ -273,6 +277,8 @@ export default function Sidebar() {
                 )}
                 {searchQuery && !searching && (
                   <button
+                    aria-label="Limpar busca"
+                    title="Limpar busca"
                     onClick={() => { setSearchQuery(''); setSearchResults(null) }}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-[11px] transition-colors"
                   >
@@ -292,6 +298,9 @@ export default function Sidebar() {
               {(['updated_at', 'created_at', 'title'] as SortKey[]).map(k => (
                 <button
                   key={k}
+                  aria-label={`Ordenar por ${k === 'updated_at' ? 'Edição' : k === 'created_at' ? 'Criação' : 'Nome'}`}
+                  aria-pressed={sortKey === k}
+                  title={`Ordenar por ${k === 'updated_at' ? 'Edição' : k === 'created_at' ? 'Criação' : 'Nome'}`}
                   onClick={() => setSortKey(k)}
                   className={`text-[11px] px-2 py-1 rounded transition-colors uppercase tracking-wider font-semibold ${sortKey === k ? 'bg-accent-primary/20 text-accent-primary' : 'text-text-muted hover:text-text-secondary'}`}
                 >
@@ -331,6 +340,9 @@ export default function Sidebar() {
                     return (
                       <div key={folder.id}>
                         <button
+                          aria-label={`Pasta: ${folder.name}`}
+                          aria-expanded={isExpanded}
+                          title={`Pasta: ${folder.name}`}
                           onClick={() => toggleFolder(folder.id)}
                           onContextMenu={e => openCtx(e, getFolderContextItems(folder))}
                           onDragOver={e => e.preventDefault()}
