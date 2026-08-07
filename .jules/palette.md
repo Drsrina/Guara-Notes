@@ -1,0 +1,3 @@
+## 2025-01-20 - Adding ARIA labels to Icon-only Buttons
+**Learning:** Found multiple instances where the application relies heavily on icon-only buttons (like settings gears, toggle panes, delete buttons) that completely lack ARIA labels, making them inaccessible to screen readers. Added aria-labels and appropriate focus-visible rings across all major interactive sidebars and panes.
+**Action:** Always ensure that `<button>` tags displaying only an emoji or an SVG icon have a clear `aria-label` or `title` describing their action (e.g. "Configurações", "Excluir modelo") and visible focus states for keyboard navigation.

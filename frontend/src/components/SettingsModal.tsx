@@ -305,11 +305,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-3 ${
+              className={`text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary ${
                 activeTab === tab.id
                   ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/30'
                   : 'text-text-secondary hover:bg-white/5 hover:text-text-primary'
               }`}
+              aria-current={activeTab === tab.id ? 'page' : undefined}
             >
               <span>{tab.icon}</span>
               {tab.label}
@@ -688,7 +689,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => handleUpdateActiveModel('chat', model.name)} className="text-[10px] bg-white/5 hover:bg-white/10 px-2 py-1 rounded text-text-secondary">Usar Chat</button>
                         <button onClick={() => handleUpdateActiveModel('embed', model.name)} className="text-[10px] bg-white/5 hover:bg-white/10 px-2 py-1 rounded text-text-secondary">Usar Embed</button>
-                        <button onClick={() => handleDeleteModel(model.name)} className="text-[10px] bg-red-500/10 hover:bg-red-500/20 px-2 py-1 rounded text-red-400">🗑️</button>
+                        <button onClick={() => handleDeleteModel(model.name)} aria-label={`Excluir modelo ${model.name}`} className="text-[10px] bg-red-500/10 hover:bg-red-500/20 px-2 py-1 rounded text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400">🗑️</button>
                       </div>
                     </div>
                   ))}
@@ -750,7 +751,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                           )}
                         </td>
                         <td className="px-4 py-2 flex gap-2">
-                          <button onClick={() => handleDeleteUser(u.id)} className="text-red-400 hover:text-red-300 text-xs" title="Excluir">🗑️</button>
+                          <button onClick={() => handleDeleteUser(u.id)} aria-label={`Excluir usuário ${u.username}`} className="text-red-400 hover:text-red-300 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 rounded" title="Excluir">🗑️</button>
                         </td>
                       </tr>
                     ))}

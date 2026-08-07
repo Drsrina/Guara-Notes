@@ -133,7 +133,8 @@ export default function Pane({ pane, canClose, canSplit }: PaneProps) {
             <button
               onClick={(e) => { e.stopPropagation(); addPane() }}
               title={`Dividir (${panes.length}/4 painéis)`}
-              className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-accent-primary hover:bg-accent-primary/10 transition-colors text-xs"
+              aria-label={`Dividir painel. ${panes.length} de 4 painéis abertos`}
+              className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-accent-primary hover:bg-accent-primary/10 transition-colors text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
             >
               ⊞
             </button>
@@ -142,7 +143,8 @@ export default function Pane({ pane, canClose, canSplit }: PaneProps) {
             <button
               onClick={(e) => { e.stopPropagation(); removePane(pane.id) }}
               title="Fechar painel"
-              className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-red-400 hover:bg-red-400/10 transition-colors text-xs"
+              aria-label="Fechar painel"
+              className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-red-400 hover:bg-red-400/10 transition-colors text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
             >
               ✕
             </button>
