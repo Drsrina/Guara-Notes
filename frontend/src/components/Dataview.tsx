@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useAppStore, useWorkspaceStore } from '../store'
 
 export default function Dataview() {
@@ -10,22 +10,37 @@ export default function Dataview() {
   const [sortKey, setSortKey] = useState<'updated_at' | 'title'>('updated_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
-  // Extrair todas as tags únicas
-  const allTags = Array.from(new Set(notes.flatMap(n => n.tags || []))).sort()
+  // ⚡ Bolt: Memoize expensive unique tag extraction across all notes
+  // Prevents O(N) array allocation + sorting on every render
+  const allTags = useMemo(() => {
+    return Array.from(new Set(notes.flatMap(n => n.tags || []))).sort()
+  }, [notes])
 
-  const filteredNotes = notes.filter(n => {
-    if (searchTerm && !n.title.toLowerCase().includes(searchTerm.toLowerCase()) && !n.content.toLowerCase().includes(searchTerm.toLowerCase())) return false
-    if (selectedFolder !== 'all' && n.folder_id !== selectedFolder) return false
-    if (selectedTag !== 'all' && !(n.tags || []).includes(selectedTag)) return false
-    return true
-  }).sort((a, b) => {
-    const valA = a[sortKey]
-    const valB = b[sortKey]
-    const mod = sortDir === 'asc' ? 1 : -1
-    if (valA < valB) return -1 * mod
-    if (valA > valB) return 1 * mod
-    return 0
-  })
+  // ⚡ Bolt: Memoize filtering and sorting to prevent unnecessary O(N log N) work
+  const filteredNotes = useMemo(() => {
+    // Hoist toLowerCase() outside the loop so we don't recalculate it for every note
+    const lowerSearch = searchTerm ? searchTerm.toLowerCase() : ''
+
+    return notes.filter(n => {
+      // ⚡ Bolt: Check title first (much shorter string), only check content if title doesn't match
+      if (lowerSearch) {
+        const titleMatch = n.title.toLowerCase().includes(lowerSearch);
+        if (!titleMatch && !n.content.toLowerCase().includes(lowerSearch)) {
+          return false;
+        }
+      }
+      if (selectedFolder !== 'all' && n.folder_id !== selectedFolder) return false
+      if (selectedTag !== 'all' && !(n.tags || []).includes(selectedTag)) return false
+      return true
+    }).sort((a, b) => {
+      const valA = a[sortKey]
+      const valB = b[sortKey]
+      const mod = sortDir === 'asc' ? 1 : -1
+      if (valA < valB) return -1 * mod
+      if (valA > valB) return 1 * mod
+      return 0
+    })
+  }, [notes, searchTerm, selectedFolder, selectedTag, sortKey, sortDir])
 
   return (
     <div className="h-full w-full bg-zinc-950 flex flex-col text-zinc-300">

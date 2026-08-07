@@ -1,0 +1,3 @@
+## 2024-05-24 - Heavy string operations during React render
+**Learning:** Found a performance bottleneck where `.toLowerCase()` was being called on full note contents inside a `.filter()` array method directly in the component body (render cycle) in `Dataview.tsx`. This causes significant main thread blocking on large datasets on every re-render.
+**Action:** Always memoize derived heavy computations like sorting and filtering with `useMemo`. Hoist constant transformations (like normalizing a search term) outside of loops, and avoid expensive operations on full document contents during render cycles if possible (or defer them).
