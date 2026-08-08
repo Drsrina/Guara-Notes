@@ -1,0 +1,3 @@
+## 2024-06-25 - Custom Icon Button Accessibility
+**Learning:** Custom bare `<button>` elements used for icon-only actions (like toggles and search clears) in the application lack the standard accessibility attributes and focus indicators provided by the primary `<Button>` UI component, negatively impacting keyboard navigation and screen reader support.
+**Action:** Always ensure any bare `<button>` implementations include `aria-label` (or `aria-labelledby`) and visible focus states (e.g., `focus-visible:ring-2 focus-visible:outline-none`) if they cannot be migrated to the main `<Button>` component due to specific styling requirements.

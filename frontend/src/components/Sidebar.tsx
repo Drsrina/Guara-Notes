@@ -218,7 +218,8 @@ export default function Sidebar() {
       >
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-3 top-6 z-10 w-6 h-6 rounded-full glass-panel flex items-center justify-center text-text-secondary hover:text-accent-primary hover:scale-110 transition-transform shadow-md cursor-pointer"
+          aria-label={isCollapsed ? 'Expandir barra lateral' : 'Recolher barra lateral'}
+          className="absolute -right-3 top-6 z-10 w-6 h-6 rounded-full glass-panel flex items-center justify-center text-text-secondary hover:text-accent-primary hover:scale-110 transition-transform shadow-md cursor-pointer focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-accent-primary"
         >
           {isCollapsed ? '▶' : '◀'}
         </button>
@@ -235,7 +236,8 @@ export default function Sidebar() {
               <button
                 onClick={() => setShowSettings(true)}
                 title="Configurações"
-                className="text-text-muted hover:text-text-primary transition-colors text-sm"
+                aria-label="Abrir configurações"
+                className="text-text-muted hover:text-text-primary transition-colors text-sm focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-accent-primary rounded"
               >
                 ⚙️
               </button>
@@ -274,7 +276,8 @@ export default function Sidebar() {
                 {searchQuery && !searching && (
                   <button
                     onClick={() => { setSearchQuery(''); setSearchResults(null) }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-[11px] transition-colors"
+                    aria-label="Limpar pesquisa"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-[11px] transition-colors focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-accent-primary rounded-full p-1"
                   >
                     ✕
                   </button>
